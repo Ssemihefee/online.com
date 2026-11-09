@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>LAN İki Kişilik Oyun</title>
+    <style>
+        body { text-align: center; font-family: sans-serif; background: #222; color: #fff; margin-top: 50px; }
+        canvas { background: #111; border: 2px solid #fff; }
+    </style>
+</head>
+<body>
+    <h1>Mini LAN Oyunu</h1>
+    <p>Kutuya dokunarak hareket ettir!</p>
+    <canvas id="oyun" width="400" height="400"></canvas>
+
+    <script>
+        const canvas = document.getElementById("oyun");
+        const ctx = canvas.getContext("2d");
+
+        let x = 200, y = 200;
+
+        // Ekrana dokunulduğunda kutuyu hareket ettir
+        canvas.addEventListener("click", (e) => {
+            const rect = canvas.getBoundingClientRect();
+            x = e.clientX - rect.left;
+            y = e.clientY - rect.top;
+        });
+
+        function ciz() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "red";
+            ctx.fillRect(x - 15, y - 15, 30, 30);
+            requestAnimationFrame(ciz);
+        }
+        ciz();
+    </script>
+</body>
+</html>
