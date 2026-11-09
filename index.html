@@ -14,7 +14,7 @@
             user-select: none;
             -webkit-user-select: none;
             -webkit-touch-callout: none;
-            touch-action: manipulation; /* Çift dokunma yakınlaştırmasını önler */
+            touch-action: manipulation;
         }
         body, html {
             margin: 0;
@@ -25,7 +25,7 @@
             color: #fff;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             overflow: hidden;
-            position: fixed; /* Ekran kaymasını önler */
+            position: fixed;
         }
 
         /* LOBBY / MENÜ STİLLERİ */
@@ -38,22 +38,69 @@
             align-items: center;
             justify-content: center;
             z-index: 10;
+            overflow-y: auto;
+            padding: 20px;
         }
         .title {
-            font-size: 28px;
+            font-size: 26px;
             font-weight: 900;
             letter-spacing: 2px;
             color: #00ffcc;
             text-shadow: 0 0 15px rgba(0,255,204,0.5);
-            margin-bottom: 20px;
+            margin-bottom: 15px;
             text-transform: uppercase;
         }
+        .input-group {
+            margin-bottom: 15px;
+            text-align: center;
+            width: 100%;
+            max-width: 300px;
+        }
+        .input-group label {
+            display: block;
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #aaa;
+        }
+        .input-group input[type="text"] {
+            width: 100%;
+            padding: 10px 15px;
+            border-radius: 20px;
+            border: 2px solid #00ffcc;
+            background: #111420;
+            color: #fff;
+            font-size: 16px;
+            text-align: center;
+            outline: none;
+        }
+        /* RENK SEÇİM ALANI */
+        .color-picker {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 5px;
+        }
+        .color-opt {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: 3px solid transparent;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        .color-opt.selected {
+            border-color: #ffffff;
+            transform: scale(1.2);
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+        }
+
         .btn {
             background: linear-gradient(135deg, #00ffcc, #0099ff);
             color: #000;
             font-weight: bold;
             font-size: 18px;
-            padding: 15px 30px;
+            padding: 14px 28px;
             border: none;
             border-radius: 30px;
             box-shadow: 0 0 20px rgba(0, 255, 204, 0.4);
@@ -69,8 +116,8 @@
             box-shadow: 0 0 25px rgba(255, 255, 255, 0.3);
         }
         #status {
-            margin-top: 15px;
-            font-size: 16px;
+            margin-top: 10px;
+            font-size: 15px;
             color: #ffcc00;
             font-weight: bold;
         }
@@ -135,7 +182,7 @@
             transform: scale(0.92);
         }
 
-        /* SKOR VE CAN BARI PANOLARI */
+        /* HUD (CAN BARLARI & İSİMLER) */
         .hud-panel {
             position: absolute;
             top: 15px;
@@ -149,7 +196,7 @@
         }
         #p1-hud { left: 15px; }
         #p2-hud { right: 15px; text-align: right; }
-        .player-name { font-size: 14px; font-weight: bold; margin-bottom: 5px; }
+        .player-name { font-size: 14px; font-weight: bold; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .hp-bar-bg {
             width: 100%;
             height: 14px;
@@ -164,6 +211,28 @@
         }
         #p1-hp { background: #ff3333; }
         #p2-hp { background: #3399ff; }
+
+        /* BİTİŞ EKRANI (GAME OVER OVERLAY) */
+        #game-over-screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(8, 9, 13, 0.9);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+            backdrop-filter: blur(10px);
+        }
+        #winnerText {
+            font-size: 32px;
+            font-weight: 900;
+            color: #ffcc00;
+            text-shadow: 0 0 20px rgba(255, 204, 0, 0.6);
+            margin-bottom: 25px;
+            text-align: center;
+            padding: 0 10px;
+        }
     </style>
 </head>
 <body>
@@ -171,6 +240,23 @@
     <!-- MENÜ EKRANI -->
     <div id="lobby">
         <div class="title">AMONG BATTLE LAN</div>
+        
+        <div class="input-group">
+            <label>OYUNCU İSMİNİZ</label>
+            <input type="text" id="playerNameInput" maxlength="12" value="Oyuncu">
+        </div>
+
+        <div class="input-group">
+            <label>KARAKTER RENGİ</label>
+            <div class="color-picker">
+                <div class="color-opt selected" data-color="#ff3333" style="background:#ff3333;"></div>
+                <div class="color-opt" data-color="#3399ff" style="background:#3399ff;"></div>
+                <div class="color-opt" data-color="#28a745" style="background:#28a745;"></div>
+                <div class="color-opt" data-color="#ffcc00" style="background:#ffcc00;"></div>
+                <div class="color-opt" data-color="#a020f0" style="background:#a020f0;"></div>
+            </div>
+        </div>
+
         <button id="host-btn" class="btn">ODA KUR (QR OLUŞTUR)</button>
         <div id="qr-box"></div>
         <div id="status">Oyuncu bekleniyor...</div>
@@ -182,11 +268,11 @@
 
         <!-- HUD (CAN BARLARI) -->
         <div id="p1-hud" class="hud-panel">
-            <div class="player-name" style="color: #ff4444;">OYUNCU 1 (KIRMIZI)</div>
+            <div id="p1-name-display" class="player-name" style="color: #ff4444;">OYUNCU 1</div>
             <div class="hp-bar-bg"><div id="p1-hp" class="hp-bar-fill"></div></div>
         </div>
         <div id="p2-hud" class="hud-panel">
-            <div class="player-name" style="color: #4488ff;">OYUNCU 2 (MAVİ)</div>
+            <div id="p2-name-display" class="player-name" style="color: #4488ff;">OYUNCU 2</div>
             <div class="hp-bar-bg"><div id="p2-hp" class="hp-bar-fill"></div></div>
         </div>
 
@@ -195,6 +281,12 @@
             <div id="joystick-knob"></div>
         </div>
         <div id="attack-btn">VUR</div>
+
+        <!-- BİTİŞ EKRANI -->
+        <div id="game-over-screen">
+            <div id="winnerText">KAZANAN</div>
+            <button id="restartBtn" class="btn">TEKRAR OYNA</button>
+        </div>
     </div>
 
     <script>
@@ -227,14 +319,25 @@
             canvas.height = screenH;
         });
 
-        // OYUN AKTÖRLERİ
+        // RENK SEÇİMİ MANTIĞI
+        let selectedColor = '#ff3333';
+        document.querySelectorAll('.color-opt').forEach(opt => {
+            opt.addEventListener('click', () => {
+                document.querySelectorAll('.color-opt').forEach(o => o.classList.remove('selected'));
+                opt.classList.add('selected');
+                selectedColor = opt.getAttribute('data-color');
+            });
+        });
+
+        // OYUN AKTÖRLERİ VE DURUMU
         let isHost = false;
         let peer, conn;
         let gameRunning = false;
+        let gameOver = false;
 
         let players = {
-            p1: { x: 150, y: screenH / 2, vx: 0, vy: 0, hp: 100, color: '#ff3333', facing: 'right', isAttacking: false, attackTimer: 0 },
-            p2: { x: screenW - 150, y: screenH / 2, vx: 0, vy: 0, hp: 100, color: '#3399ff', facing: 'left', isAttacking: false, attackTimer: 0 }
+            p1: { name: 'Oyuncu 1', x: 150, y: screenH / 2, vx: 0, vy: 0, hp: 100, color: '#ff3333', facing: 'right', isAttacking: false, attackTimer: 0 },
+            p2: { name: 'Oyuncu 2', x: screenW - 150, y: screenH / 2, vx: 0, vy: 0, hp: 100, color: '#3399ff', facing: 'left', isAttacking: false, attackTimer: 0 }
         };
 
         let myRole = 'p1';
@@ -256,6 +359,11 @@
             myRole = 'p1';
             initHost();
         };
+
+        function getMyName() {
+            let val = document.getElementById('playerNameInput').value.trim();
+            return val ? val : (myRole === 'p1' ? 'Oyuncu 1' : 'Oyuncu 2');
+        }
 
         function initHost() {
             peer = new Peer();
@@ -288,9 +396,18 @@
 
         function setupConnection() {
             conn.on('open', () => {
+                // Oyuncu isim ve renk bilgilerini gönder
+                if (isHost) {
+                    players.p1.name = getMyName();
+                    players.p1.color = selectedColor;
+                } else {
+                    conn.send({ type: 'init_info', name: getMyName(), color: selectedColor });
+                }
+
                 document.getElementById('lobby').style.display = 'none';
                 document.getElementById('game-container').style.display = 'block';
                 gameRunning = true;
+                gameOver = false;
                 requestAnimationFrame(gameLoop);
             });
 
@@ -298,21 +415,70 @@
                 if (data.type === 'state') {
                     players = data.players;
                     updateHUD();
-                } else if (data.type === 'input') {
+                    if (data.gameOver) {
+                        triggerGameOverScreen(data.winnerText);
+                    }
+                } else if (data.type === 'init_info') {
                     if (isHost) {
+                        players.p2.name = data.name;
+                        players.p2.color = data.color;
+                    }
+                } else if (data.type === 'input') {
+                    if (isHost && !gameOver) {
                         players.p2.vx = data.vx;
                         players.p2.vy = data.vy;
                         if (data.attack && !players.p2.isAttacking) {
                             triggerAttack('p2');
                         }
                     }
+                } else if (data.type === 'restart') {
+                    resetMatch();
                 }
             });
         }
 
         function updateHUD() {
+            document.getElementById('p1-name-display').innerText = players.p1.name;
+            document.getElementById('p1-name-display').style.color = players.p1.color;
             document.getElementById('p1-hp').style.width = Math.max(0, players.p1.hp) + '%';
+            document.getElementById('p1-hp').style.background = players.p1.color;
+
+            document.getElementById('p2-name-display').innerText = players.p2.name;
+            document.getElementById('p2-name-display').style.color = players.p2.color;
             document.getElementById('p2-hp').style.width = Math.max(0, players.p2.hp) + '%';
+            document.getElementById('p2-hp').style.background = players.p2.color;
+        }
+
+        // BİTİŞ EKRANI
+        function triggerGameOverScreen(winnerText) {
+            gameOver = true;
+            document.getElementById('winnerText').innerText = winnerText;
+            document.getElementById('game-over-screen').style.display = 'flex';
+        }
+
+        // TEKRAR OYNA BUTONU
+        document.getElementById('restartBtn').onclick = () => {
+            if (isHost) {
+                resetMatch();
+            } else if (conn && conn.open) {
+                conn.send({ type: 'restart' });
+            }
+        };
+
+        function resetMatch() {
+            gameOver = false;
+            document.getElementById('game-over-screen').style.display = 'none';
+            players.p1.hp = 100;
+            players.p2.hp = 100;
+            players.p1.x = 150;
+            players.p1.y = screenH / 2;
+            players.p2.x = screenW - 150;
+            players.p2.y = screenH / 2;
+            players.p1.vx = 0; players.p1.vy = 0;
+            players.p2.vx = 0; players.p2.vy = 0;
+            if (isHost && conn && conn.open) {
+                conn.send({ type: 'state', players: players, gameOver: false });
+            }
         }
 
         // ÇOKLU DOKUNMA (MULTI-TOUCH) VE JOYSTICK SİSTEMİ
@@ -324,7 +490,7 @@
 
         joyZone.addEventListener('pointerdown', (e) => {
             e.preventDefault();
-            if (joyPointerId !== null) return;
+            if (joyPointerId !== null || gameOver) return;
             joyPointerId = e.pointerId;
             joyZone.setPointerCapture(e.pointerId);
             
@@ -334,7 +500,7 @@
         });
 
         joyZone.addEventListener('pointermove', (e) => {
-            if (e.pointerId === joyPointerId) {
+            if (e.pointerId === joyPointerId && !gameOver) {
                 e.preventDefault();
                 moveKnob(e.clientX, e.clientY);
             }
@@ -371,10 +537,11 @@
             sendInput();
         }
 
-        // SALDIRI BUTONU (ÇOKLU DOKUNMA UYUMLU)
+        // SALDIRI BUTONU
         const attackBtn = document.getElementById('attack-btn');
         attackBtn.addEventListener('pointerdown', (e) => {
             e.preventDefault();
+            if (gameOver) return;
             if (isHost) {
                 if (!players.p1.isAttacking) triggerAttack('p1');
             } else {
@@ -405,12 +572,18 @@
 
             if (dist < 65) {
                 enemy.hp -= 10;
-                if (enemy.hp < 0) enemy.hp = 0;
+                if (enemy.hp <= 0) {
+                    enemy.hp = 0;
+                    let winnerName = p.name + " KAZANDI!";
+                    triggerGameOverScreen(winnerName);
+                }
             }
         }
 
         // FİZİK VE GÜNCELLEME
         function updatePhysics() {
+            if (gameOver) return;
+
             ['p1', 'p2'].forEach(key => {
                 let p = players[key];
                 
@@ -430,7 +603,8 @@
             });
 
             if (conn && conn.open) {
-                conn.send({ type: 'state', players: players });
+                let winnerText = gameOver ? document.getElementById('winnerText').innerText : '';
+                conn.send({ type: 'state', players: players, gameOver: gameOver, winnerText: winnerText });
             }
             updateHUD();
         }
@@ -440,24 +614,35 @@
             ctx.save();
             ctx.translate(p.x, p.y);
 
+            // İsmi Karakterin Üstüne Çiz
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 12px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(p.name, 0, -32);
+
             if (p.facing === 'left') ctx.scale(-1, 1);
 
+            // Gölge
             ctx.fillStyle = 'rgba(0,0,0,0.3)';
             ctx.beginPath();
             ctx.ellipse(0, 20, 18, 7, 0, 0, Math.PI * 2);
             ctx.fill();
 
+            // Sırt Çantası
             ctx.fillStyle = p.color;
             ctx.fillRect(-22, -10, 8, 20);
 
+            // Gövde
             ctx.beginPath();
             ctx.arc(0, -5, 16, Math.PI, 0);
             ctx.rect(-16, -5, 32, 22);
             ctx.fill();
 
+            // Bacaklar
             ctx.fillRect(-14, 15, 10, 10);
             ctx.fillRect(4, 15, 10, 10);
 
+            // Vizör
             ctx.fillStyle = '#aaddff';
             ctx.beginPath();
             ctx.ellipse(4, -5, 10, 6, 0, 0, Math.PI * 2);
@@ -466,6 +651,7 @@
             ctx.lineWidth = 1.5;
             ctx.stroke();
 
+            // Saldırı Efekti
             if (p.isAttacking) {
                 ctx.strokeStyle = '#ffcc00';
                 ctx.lineWidth = 4;
