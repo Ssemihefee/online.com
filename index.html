@@ -339,18 +339,17 @@
             canvas.height = screenH;
         });
 
-        // ORTA ÇAĞ / ORGANİK SES MOTORU (Web Audio API)
+        // ORTA ÇAĞ SES MOTORU (Web Audio API)
         let audioCtx = null;
         function initAudio() {
             if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             if (audioCtx.state === 'suspended') audioCtx.resume();
         }
 
-        // Orta Çağ Taverna / Heyecanlı Melodi (Organik Flüt/Lüt Benzeri Sesler)
         let bgmTimer = null;
         function startBGM() {
             if (bgmTimer) return;
-            const medievalNotes = [130.81, 146.83, 164.81, 196.00, 220.00]; // Doğal gam
+            const medievalNotes = [130.81, 146.83, 164.81, 196.00, 220.00];
             let step = 0;
             bgmTimer = setInterval(() => {
                 if (!gameRunning || gameOver) return;
@@ -358,12 +357,10 @@
                 try {
                     let osc = audioCtx.createOscillator();
                     let gain = audioCtx.createGain();
-                    osc.type = 'triangle'; // Mekanik olmayan yumuşak organik dalga
+                    osc.type = 'triangle';
                     osc.frequency.setValueAtTime(medievalNotes[step % medievalNotes.length], audioCtx.currentTime);
-                    
                     gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
                     gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.35);
-
                     osc.connect(gain);
                     gain.connect(audioCtx.destination);
                     osc.start();
@@ -377,62 +374,46 @@
             if (bgmTimer) { clearInterval(bgmTimer); bgmTimer = null; }
         }
 
-        // Boşta Havayı Yarma Sesi (Rüzgar Hışırtısı)
         function playWhooshSound() {
             initAudio();
             try {
                 let bufferSize = audioCtx.sampleRate * 0.1;
                 let buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
                 let output = buffer.getChannelData(0);
-                for (let i = 0; i < bufferSize; i++) {
-                    output[i] = Math.random() * 2 - 1;
-                }
-
+                for (let i = 0; i < bufferSize; i++) { output[i] = Math.random() * 2 - 1; }
                 let whiteNoise = audioCtx.createBufferSource();
                 whiteNoise.buffer = buffer;
-
                 let filter = audioCtx.createBiquadFilter();
                 filter.type = 'bandpass';
                 filter.frequency.setValueAtTime(600, audioCtx.currentTime);
                 filter.Q.setValueAtTime(3, audioCtx.currentTime);
-
                 let gain = audioCtx.createGain();
                 gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
                 gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
-
                 whiteNoise.connect(filter);
                 filter.connect(gain);
                 gain.connect(audioCtx.destination);
-
                 whiteNoise.start();
             } catch(e){}
         }
 
-        // Orta Çağ Kılıç / Topuz Darbe Sesi (Tok ve Derin Çelik Sesi)
         function playHitSound() {
             initAudio();
             try {
                 let osc = audioCtx.createOscillator();
                 let osc2 = audioCtx.createOscillator();
                 let gain = audioCtx.createGain();
-
                 osc.type = 'sawtooth';
                 osc2.type = 'triangle';
-
-                // Metalik çınlama ve tok darbe kombinasyonu
                 osc.frequency.setValueAtTime(180, audioCtx.currentTime);
                 osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.25);
-
                 osc2.frequency.setValueAtTime(90, audioCtx.currentTime);
                 osc2.frequency.exponentialRampToValueAtTime(20, audioCtx.currentTime + 0.25);
-
                 gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
                 gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
-
                 osc.connect(gain);
                 osc2.connect(gain);
                 gain.connect(audioCtx.destination);
-
                 osc.start();
                 osc2.start();
                 osc.stop(audioCtx.currentTime + 0.25);
@@ -500,38 +481,46 @@
                 new QRCode(document.getElementById("qr-box"), { text: joinUrl, width: 160, height: 160 });
                 document.getElementById('status').innerText = "İkinci telefon ile QR Kodu taratın!";
             });
-            peer.on('connection', (c) => { conn = c; setupConnection(); });
+            peer.on('connection', (c) => { 
+                conn = c; 
+                setupConnection(); 
+            });
         }
 
         function initClient(targetId) {
             peer = new Peer();
-            peer.on('open', () => { conn = peer.connect(targetId); setupConnection(); });
+            peer.on('open', () => { 
+                conn = peer.connect(targetId); 
+                setupConnection(); 
+            });
         }
 
         function setupConnection() {
-            conn.on('open', () => {
-                // Bağlantı sağlandığı an iki cihazda da seçim ekranını aç
-                document.getElementById('setup-section').style.display = 'none';
-                document.getElementById('custom-section').style.display = 'flex';
-                document.getElementById('status').innerText = "";
-            });
+            // Bağlantı kurulduğu an iki cihazda da doğrudan isim/renk seçimi ekranını aç
+            document.getElementById('setup-section').style.display = 'none';
+            document.getElementById('custom-section').style.display = 'flex';
+            document.getElementById('status').innerText = "";
 
             conn.on('data', (data) => {
                 if (data.type === 'state') {
                     players = data.players;
                     updateHUD();
+                    if (!gameRunning && data.gameStarted) {
+                        startTheGame();
+                    }
                     if (data.gameOver) triggerGameOverScreen(data.winnerText);
                 } else if (data.type === 'player_config') {
-                    if (isHost) { players.p2.name = data.name; players.p2.color = data.color; }
-                    else { players.p1.name = data.name; players.p1.color = data.color; }
+                    if (isHost) { 
+                        players.p2.name = data.name; 
+                        players.p2.color = data.color; 
+                    } else { 
+                        players.p1.name = data.name; 
+                        players.p1.color = data.color; 
+                    }
                 } else if (data.type === 'ready_signal') {
                     if (isHost) {
                         players.p2.ready = true;
                         checkBothReady();
-                    } else {
-                        // Client tarafında rakip hazır sinyali geldiğinde butonu normalleştir
-                        document.getElementById('ready-btn').innerText = "OYUNA BAŞLA";
-                        document.getElementById('ready-btn').style.opacity = "1";
                     }
                 } else if (data.type === 'input') {
                     if (isHost && !gameOver) {
@@ -543,10 +532,6 @@
                     if (isHost) {
                         players.p2.ready = true;
                         checkRestartBothReady();
-                    } else {
-                        document.getElementById('restartBtn').innerText = "TEKRAR OYNA";
-                        document.getElementById('restartBtn').style.opacity = "1";
-                        document.getElementById('restartBtn').disabled = false;
                     }
                 }
             });
@@ -576,10 +561,6 @@
 
         function checkBothReady() {
             if (players.p1.ready && players.p2.ready) {
-                // Host, state verisiyle birlikte client'a da oyunun başladığını bildirir
-                if (conn && conn.open) {
-                    conn.send({ type: 'state', players: players, gameOver: false, winnerText: '' });
-                }
                 startTheGame();
             }
         }
@@ -650,7 +631,7 @@
             players.p2.vx = 0; players.p2.vy = 0;
             startBGM();
             if (isHost && conn && conn.open) {
-                conn.send({ type: 'state', players: players, gameOver: false, winnerText: '' });
+                conn.send({ type: 'state', players: players, gameOver: false, gameStarted: true, winnerText: '' });
             }
         }
 
@@ -764,9 +745,9 @@
                 }
             });
 
-            if (conn && conn.open) {
+            if (isHost && conn && conn.open) {
                 let winnerText = gameOver ? document.getElementById('winnerText').innerText : '';
-                conn.send({ type: 'state', players: players, gameOver: gameOver, winnerText: winnerText });
+                conn.send({ type: 'state', players: players, gameOver: gameOver, gameStarted: gameRunning, winnerText: winnerText });
             }
             updateHUD();
         }
@@ -844,3 +825,4 @@
     </script>
 </body>
 </html>
+
