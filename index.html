@@ -2,138 +2,594 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Net LAN Oyunu</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Among Us: Space Arena 2D</title>
+    <!-- PeerJS for WebRTC Connection & QRCode.js for seamless QR generation -->
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
-        body { background: #111; color: #fff; text-align: center; font-family: Arial, sans-serif; margin: 0; padding: 10px; }
-        .kutu { background: #222; padding: 15px; margin: 10px auto; border-radius: 8px; max-width: 350px; }
-        button { background: #28a745; color: white; border: none; padding: 10px 15px; font-size: 16px; border-radius: 5px; cursor: pointer; margin: 5px; }
-        .btn2 { background: #007bff; }
-        textarea { width: 90%; height: 50px; background: #333; color: #fff; border: 1px solid #555; font-size: 10px; }
-        canvas { background: #000; border: 2px solid #fff; display: block; margin: 10px auto; touch-action: none; }
-        #durum { font-size: 16px; color: yellow; font-weight: bold; margin: 5px; }
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #0b0e14;
+            color: #ffffff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Lobby & Setup Screen */
+        #lobby {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(11, 14, 20, 0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            padding: 20px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 28px;
+            color: #ff4757;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 5px;
+            text-shadow: 0 0 10px rgba(255, 71, 87, 0.5);
+        }
+
+        p.subtitle {
+            font-size: 14px;
+            color: #a4b0be;
+            margin-bottom: 25px;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #ff4757, #ff6b81);
+            color: white;
+            border: none;
+            padding: 15px 35px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 12px;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(255, 71, 87, 0.4);
+            transition: all 0.2s ease;
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+        }
+
+        #qrContainer {
+            margin-top: 20px;
+            background: #ffffff;
+            padding: 15px;
+            border-radius: 15px;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+            display: none;
+        }
+
+        #statusText {
+            margin-top: 15px;
+            font-size: 16px;
+            color: #eccc68;
+            font-weight: bold;
+        }
+
+        /* Canvas Game Container */
+        #gameArea {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            background: #1e272e;
+            border: 3px solid #353b48;
+            border-radius: 10px;
+            box-shadow: 0 0 30px rgba(0,0,0,0.8);
+        }
+
+        /* Mobile Controls Overlay */
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            width: 100%;
+            height: 140px;
+            display: none; /* Only shown when connected */
+            justify-content: space-between;
+            padding: 0 25px;
+            pointer-events: none;
+            z-index: 50;
+        }
+
+        .dpad, .action-pad {
+            pointer-events: auto;
+            position: relative;
+        }
+
+        /* Joystick D-Pad */
+        .dpad {
+            width: 120px;
+            height: 120px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 60px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+        }
+
+        .d-btn {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: bold;
+        }
+        .d-btn:active { background: rgba(255, 71, 87, 0.6); }
+        .d-up { grid-column: 2; grid-row: 1; }
+        .d-down { grid-column: 2; grid-row: 3; }
+        .d-left { grid-column: 1; grid-row: 2; }
+        .d-right { grid-column: 3; grid-row: 2; }
+
+        /* Attack Button */
+        .attack-btn {
+            width: 90px;
+            height: 90px;
+            background: linear-gradient(135deg, #ff4757, #ff6b81);
+            border: 3px solid #ffffff;
+            border-radius: 50%;
+            color: white;
+            font-size: 16px;
+            font-weight: 900;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 15px rgba(255, 71, 87, 0.8);
+            margin-top: 15px;
+        }
+        .attack-btn:active {
+            transform: scale(0.9);
+            background: #ff6b81;
+        }
+
+        /* HUD Health bars */
+        #hud {
+            position: absolute;
+            top: 15px;
+            width: 90%;
+            max-width: 600px;
+            display: flex;
+            justify-content: space-between;
+            z-index: 40;
+        }
+
+        .hp-card {
+            background: rgba(0,0,0,0.6);
+            padding: 8px 15px;
+            border-radius: 10px;
+            width: 45%;
+            border: 1px solid #555;
+        }
+
+        .hp-title {
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+
+        .hp-bar-bg {
+            width: 100%;
+            height: 12px;
+            background: #333;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .hp-bar-fill {
+            height: 100%;
+            width: 100%;
+            transition: width 0.2s ease;
+        }
+
+        /* Game Over Screen */
+        #gameOver {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 120;
+        }
+
+        #winnerText {
+            font-size: 32px;
+            font-weight: 900;
+            color: #2ed573;
+            margin-bottom: 20px;
+            text-shadow: 0 0 15px rgba(46, 213, 115, 0.6);
+        }
     </style>
 </head>
 <body>
 
-    <h3>İki Kişilik LAN Oyunu</h3>
-    <div id="durum">Durum: Bekleniyor...</div>
-
-    <div id="menu">
-        <div class="kutu">
-            <p><b>1. Cihaz İşlemi:</b></p>
-            <button id="kurBtn">1. Oda Kodu Üret</button>
-            <br>
-            <textarea id="kod1" placeholder="Çıkan kodu kopyala"></textarea>
-        </div>
-
-        <div class="kutu">
-            <p><b>2. Cihaz İşlemi:</b></p>
-            <textarea id="kod2" placeholder="1. cihazın kodunu buraya yapıştır"></textarea>
-            <br>
-            <button id="baglanBtn" class="btn2">2. Bağlan ve Onayla</button>
-            <br>
-            <textarea id="cevapKodu" placeholder="Burada çıkan kodu 1. cihaza geri götür"></textarea>
-        </div>
+    <!-- LOBBY OVERLAY -->
+    <div id="lobby">
+        <h1>AMONG US: ARENA</h1>
+        <p class="subtitle">Aynı Wi-Fi (LAN) Üzerinden 1v1 Dövüş</p>
         
-        <div class="kutu" id="sonAdim" style="display:none;">
-            <p><b>Son Adım (1. Cihaz İçin):</b></p>
-            <textarea id="sonKod" placeholder="2. cihazdan gelen kodu buraya yapıştır"></textarea>
-            <br>
-            <button id="bitirBtn" class="btn2">Oyunu Başlat</button>
+        <button id="createRoomBtn" class="btn">1. CİHAZ: ODA KUR (QR OLUŞTUR)</button>
+
+        <div id="qrContainer">
+            <div id="qrcode"></div>
+        </div>
+
+        <div id="statusText">Diğer cihazın katılması bekleniyor...</div>
+    </div>
+
+    <!-- HUD HEALTHBARS -->
+    <div id="hud">
+        <div class="hp-card">
+            <div class="hp-title" style="color: #ff4757;">OYUNCU 1 (KIRMIZI)</div>
+            <div class="hp-bar-bg"><div id="hp1" class="hp-bar-fill" style="background: #ff4757;"></div></div>
+        </div>
+        <div class="hp-card">
+            <div class="hp-title" style="color: #1e90ff;">OYUNCU 2 (MAVİ)</div>
+            <div class="hp-bar-bg"><div id="hp2" class="hp-bar-fill" style="background: #1e90ff;"></div></div>
         </div>
     </div>
 
-    <canvas id="oyun" width="320" height="320"></canvas>
+    <!-- GAME CANVAS -->
+    <div id="gameArea">
+        <canvas id="gameCanvas" width="600" height="400"></canvas>
+    </div>
+
+    <!-- TOUCH CONTROLS -->
+    <div id="controls">
+        <div class="dpad">
+            <div class="d-btn d-up" id="btnUp">▲</div>
+            <div class="d-btn d-left" id="btnLeft">◄</div>
+            <div class="d-btn d-right" id="btnRight">►</div>
+            <div class="d-btn d-down" id="btnDown">▼</div>
+        </div>
+        <div class="action-pad">
+            <div class="attack-btn" id="btnAttack">VUR 👊</div>
+        </div>
+    </div>
+
+    <!-- GAME OVER SCREEN -->
+    <div id="gameOver">
+        <div id="winnerText">KAZANAN: PIRAVOR!</div>
+        <button class="btn" onclick="location.reload()">YENİDEN OYNA</button>
+    </div>
 
     <script>
-        const canvas = document.getElementById("oyun");
+        // Game Canvas & Context Setup
+        const canvas = document.getElementById("gameCanvas");
         const ctx = canvas.getContext("2d");
 
-        let pc = new RTCPeerConnection({ iceServers: [] });
-        let dataChannel;
+        // UI Elements
+        const lobby = document.getElementById("lobby");
+        const statusText = document.getElementById("statusText");
+        const qrContainer = document.getElementById("qrContainer");
+        const controls = document.getElementById("controls");
+        const gameOverScreen = document.getElementById("gameOver");
+        const winnerText = document.getElementById("winnerText");
+        const hp1Bar = document.getElementById("hp1");
+        const hp2Bar = document.getElementById("hp2");
 
-        let ben = { x: 50, y: 50, renk: "red" };
-        let diger = { x: 200, y: 200, renk: "blue" };
+        // PeerJS Networking Variables
+        let peer = null;
+        let conn = null;
+        let isHost = false;
 
-        // 1. CİHAZ: Oda Kodunu Üretir
-        document.getElementById("kurBtn").onclick = async () => {
-            dataChannel = pc.createDataChannel("oyun");
-            kanalAyarla();
+        // Map Boundaries
+        const MAP = { width: 600, height: 400 };
 
-            let offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-
-            pc.onicecandidate = (e) => {
-                if (!e.candidate) {
-                    document.getElementById("kod1").value = JSON.stringify(pc.localDescription);
-                    document.getElementById("durum").innerText = "Kod üretildi. 2. cihaza gönder.";
-                }
-            };
+        // Players Data Model
+        let players = {
+            p1: { x: 100, y: 200, color: "#ff4757", visorColor: "#70a1ff", hp: 100, facing: "right", attacking: false, attackCooldown: 0 },
+            p2: { x: 500, y: 200, color: "#1e90ff", visorColor: "#70a1ff", hp: 100, facing: "left", attacking: false, attackCooldown: 0 }
         };
 
-        // 2. CİHAZ: Kodu Yapar ve Cevap Üretir
-        document.getElementById("baglanBtn").onclick = async () => {
-            let val = document.getElementById("kod2").value.trim();
-            if(!val) return alert("Kodu boş bırakma!");
+        let myRole = null; // 'p1' or 'p2'
 
-            pc.ondatachannel = (e) => {
-                dataChannel = e.channel;
-                kanalAyarla();
-            };
+        // Check URL Parameters to auto-connect if scanned via QR
+        window.addEventListener("load", () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const joinRoomId = urlParams.get("room");
 
-            await pc.setRemoteDescription(JSON.parse(val));
-            let answer = await pc.createAnswer();
-            await pc.setLocalDescription(answer);
-
-            pc.onicecandidate = (e) => {
-                if (!e.candidate) {
-                    document.getElementById("cevapKodu").value = JSON.stringify(pc.localDescription);
-                    document.getElementById("durum").innerText = "Cevap üretildi. 1. cihaza geri götür.";
-                    document.getElementById("sonAdim").style.display = "block";
-                }
-            };
-        };
-
-        // 1. CİHAZ: 2. Cihazdan Gelen Cevabı Onaylar
-        document.getElementById("bitirBtn").onclick = async () => {
-            let val = document.getElementById("sonKod").value.trim();
-            if(!val) return alert("Kodu boş bırakma!");
-
-            await pc.setRemoteDescription(JSON.parse(val));
-            document.getElementById("durum").innerText = "Bağlantı kuruluyor...";
-        };
-
-        function kanalAyarla() {
-            dataChannel.onopen = () => {
-                document.getElementById("durum").innerText = "BAĞLANDI! OYNAYABİLİRSİNİZ.";
-                document.getElementById("menu").style.display = "none";
-            };
-            dataChannel.onmessage = (e) => {
-                let d = JSON.parse(e.data);
-                diger.x = d.x;
-                diger.y = d.y;
-            };
-        }
-
-        canvas.onclick = (e) => {
-            let r = canvas.getBoundingClientRect();
-            ben.x = e.clientX - r.left;
-            ben.y = e.clientY - r.top;
-            if (dataChannel && dataChannel.readyState === "open") {
-                dataChannel.send(JSON.stringify({ x: ben.x, y: ben.y }));
+            if (joinRoomId) {
+                // If scanned QR code, auto connect as Client (Player 2)
+                document.getElementById("createRoomBtn").style.display = "none";
+                statusText.innerText = "Odaya bağlanılıyor...";
+                joinRoom(joinRoomId);
             }
-        };
+        });
 
-        function dongu() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = ben.renk;
-            ctx.fillRect(ben.x - 10, ben.y - 10, 20, 20);
-            ctx.fillStyle = diger.renk;
-            ctx.fillRect(diger.x - 10, diger.y - 10, 20, 20);
-            requestAnimationFrame(dongu);
+        // 1. Cihaz: Oda Kur tuşuna basınca
+        document.getElementById("createRoomBtn").addEventListener("click", () => {
+            isHost = true;
+            myRole = 'p1';
+            statusText.innerText = "Sunucu kuruluyor...";
+
+            // Create unique Peer ID
+            peer = new Peer();
+
+            peer.on("open", (id) => {
+                statusText.innerText = "QR Kod Taranmayı Bekliyor!";
+                qrContainer.style.display = "block";
+
+                // Generate URL for 2nd phone to scan
+                const currentUrl = window.location.href.split('?')[0];
+                const roomUrl = `${currentUrl}?room=${id}`;
+
+                // Clear and render QR
+                document.getElementById("qrcode").innerHTML = "";
+                new QRCode(document.getElementById("qrcode"), {
+                    text: roomUrl,
+                    width: 160,
+                    height: 160
+                });
+            });
+
+            // Listen for 2nd player connection
+            peer.on("connection", (connection) => {
+                conn = connection;
+                setupDataListener();
+                startGame();
+            });
+
+            peer.on("error", (err) => {
+                alert("Bağlantı hatası: " + err);
+            });
+        });
+
+        // 2. Cihaz: QR Kod okutulup girildiğinde
+        function joinRoom(roomId) {
+            isHost = false;
+            myRole = 'p2';
+            peer = new Peer();
+
+            peer.on("open", () => {
+                conn = peer.connect(roomId);
+                setupDataListener();
+                
+                conn.on("open", () => {
+                    startGame();
+                });
+            });
+
+            peer.on("error", (err) => {
+                alert("Odaya katılırken hata oluştu! Oda bulunamadı.");
+            });
         }
-        dongu();
+
+        // Data Handling between peers
+        function setupDataListener() {
+            conn.on("data", (data) => {
+                if (data.type === "stateUpdate" && !isHost) {
+                    // Client receives synced game state from Host
+                    players = data.players;
+                    updateHPBars();
+                } else if (data.type === "playerInput" && isHost) {
+                    // Host receives Client inputs and updates Player 2
+                    handlePlayerInput('p2', data.dir, data.attack);
+                }
+            });
+
+            conn.on("close", () => {
+                alert("Diğer oyuncunun bağlantısı koptu!");
+                location.reload();
+            });
+        }
+
+        function startGame() {
+            lobby.style.display = "none";
+            controls.style.display = "flex";
+            
+            // Start sync loop for Host
+            if (isHost) {
+                setInterval(() => {
+                    if (conn && conn.open) {
+                        conn.send({ type: "stateUpdate", players: players });
+                    }
+                }, 1000 / 30); // 30 FPS networking sync
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Movement & Attack Input Processing
+        let localInput = { up: false, down: false, left: false, right: false, attack: false };
+
+        function handlePlayerInput(role, dir, attack) {
+            const player = players[role];
+            if (player.hp <= 0) return;
+
+            const speed = 4;
+            if (dir.up && player.y > 40) player.y -= speed;
+            if (dir.down && player.y < MAP.height - 40) player.y += speed;
+            if (dir.left && player.x > 30) {
+                player.x -= speed;
+                player.facing = "left";
+            }
+            if (dir.right && player.x < MAP.width - 30) {
+                player.x += speed;
+                player.facing = "right";
+            }
+
+            // Attack logic
+            if (attack && player.attackCooldown <= 0) {
+                player.attacking = true;
+                player.attackCooldown = 20; // Frame cooldown
+
+                // Check hit collision against opponent
+                const opponentRole = (role === 'p1') ? 'p2' : 'p1';
+                const opponent = players[opponentRole];
+
+                const distance = Math.hypot(player.x - opponent.x, player.y - opponent.y);
+                if (distance < 50) { // Punch range
+                    opponent.hp = Math.max(0, opponent.hp - 15); // Deal 15 damage
+                    updateHPBars();
+
+                    if (opponent.hp <= 0) {
+                        endGame(role === 'p1' ? "OYUNCU 1 (KIRMIZI)" : "OYUNCU 2 (MAVİ)");
+                    }
+                }
+            }
+        }
+
+        // Touch Control Listeners
+        function bindTouchBtn(id, key) {
+            const btn = document.getElementById(id);
+            const startHandler = (e) => { e.preventDefault(); localInput[key] = true; sendInput(); };
+            const endHandler = (e) => { e.preventDefault(); localInput[key] = false; sendInput(); };
+
+            btn.addEventListener("touchstart", startHandler);
+            btn.addEventListener("touchend", endHandler);
+            btn.addEventListener("mousedown", startHandler);
+            btn.addEventListener("mouseup", endHandler);
+        }
+
+        bindTouchBtn("btnUp", "up");
+        bindTouchBtn("btnDown", "down");
+        bindTouchBtn("btnLeft", "left");
+        bindTouchBtn("btnRight", "right");
+
+        document.getElementById("btnAttack").addEventListener("touchstart", (e) => {
+            e.preventDefault();
+            localInput.attack = true;
+            sendInput();
+            setTimeout(() => { localInput.attack = false; }, 100);
+        });
+
+        document.getElementById("btnAttack").addEventListener("mousedown", (e) => {
+            e.preventDefault();
+            localInput.attack = true;
+            sendInput();
+            setTimeout(() => { localInput.attack = false; }, 100);
+        });
+
+        function sendInput() {
+            if (isHost) {
+                handlePlayerInput('p1', localInput, localInput.attack);
+            } else if (conn && conn.open) {
+                conn.send({ type: "playerInput", dir: localInput, attack: localInput.attack });
+            }
+        }
+
+        function updateHPBars() {
+            hp1Bar.style.width = players.p1.hp + "%";
+            hp2Bar.style.width = players.p2.hp + "%";
+        }
+
+        function endGame(winnerName) {
+            winnerText.innerText = "KAZANAN: " + winnerName;
+            gameOverScreen.style.display = "flex";
+        }
+
+        // Draw Among Us Crewmate Characters
+        function drawCrewmate(p) {
+            ctx.save();
+            ctx.translate(p.x, p.y);
+
+            if (p.facing === "left") {
+                ctx.scale(-1, 1);
+            }
+
+            // Backpack (Oxygen Tank)
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.roundRect(-22, -15, 10, 25, 4);
+            ctx.fill();
+            ctx.stroke();
+
+            // Main Body
+            ctx.beginPath();
+            ctx.roundRect(-15, -25, 30, 40, 15);
+            ctx.fill();
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = "#000000";
+            ctx.stroke();
+
+            // Visor (Helmet Glass)
+            ctx.fillStyle = p.visorColor;
+            ctx.beginPath();
+            ctx.ellipse(3, -10, 12, 8, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Visor Shine Effect
+            ctx.fillStyle = "#ffffff";
+            ctx.beginPath();
+            ctx.ellipse(6, -12, 4, 2, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Punch Animation (Knife/Fist Attack Effect)
+            if (p.attacking) {
+                ctx.fillStyle = "#ff4757";
+                ctx.beginPath();
+                ctx.arc(25, 0, 12, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = "#ffffff";
+                ctx.stroke();
+            }
+
+            ctx.restore();
+        }
+
+        // Main Canvas Render Loop
+        function gameLoop() {
+            // Clear Map
+            ctx.clearRect(0, 0, MAP.width, MAP.height);
+
+            // Draw Space Arena Floor Details
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
+            ctx.lineWidth = 2;
+            for (let x = 0; x < MAP.width; x += 40) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, MAP.height); ctx.stroke();
+            }
+            for (let y = 0; y < MAP.height; y += 40) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(MAP.width, y); ctx.stroke();
+            }
+
+            // Decrement attack cooldowns
+            if (players.p1.attackCooldown > 0) players.p1.attackCooldown--;
+            if (players.p2.attackCooldown > 0) players.p2.attackCooldown--;
+            if (players.p1.attackCooldown < 15) players.p1.attacking = false;
+            if (players.p2.attackCooldown < 15) players.p2.attacking = false;
+
+            // Draw Both Players
+            drawCrewmate(players.p1);
+            drawCrewmate(players.p2);
+
+            requestAnimationFrame(gameLoop);
+        }
     </script>
 </body>
 </html>
