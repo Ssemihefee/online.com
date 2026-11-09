@@ -49,6 +49,7 @@
             text-shadow: 0 0 15px rgba(0,255,204,0.5);
             margin-bottom: 15px;
             text-transform: uppercase;
+            text-align: center;
         }
         .input-group {
             margin-bottom: 15px;
@@ -74,7 +75,6 @@
             text-align: center;
             outline: none;
         }
-        /* RENK SEÇİM ALANI */
         .color-picker {
             display: flex;
             justify-content: center;
@@ -94,7 +94,6 @@
             transform: scale(1.2);
             box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
         }
-
         .btn {
             background: linear-gradient(135deg, #00ffcc, #0099ff);
             color: #000;
@@ -120,6 +119,14 @@
             font-size: 15px;
             color: #ffcc00;
             font-weight: bold;
+            text-align: center;
+            padding: 0 10px;
+        }
+        .screen-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
         }
 
         /* OYUN EKRANI */
@@ -209,10 +216,8 @@
             width: 100%;
             transition: width 0.15s ease-out;
         }
-        #p1-hp { background: #ff3333; }
-        #p2-hp { background: #3399ff; }
 
-        /* BİTİŞ EKRANI (GAME OVER OVERLAY) */
+        /* BİTİŞ EKRANI */
         #game-over-screen {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -229,37 +234,67 @@
             font-weight: 900;
             color: #ffcc00;
             text-shadow: 0 0 20px rgba(255, 204, 0, 0.6);
-            margin-bottom: 25px;
+            margin-bottom: 15px;
             text-align: center;
             padding: 0 10px;
+        }
+        #restartStatus {
+            font-size: 16px;
+            color: #00ffcc;
+            margin-bottom: 25px;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        /* EKRAN TİTREME ANİMASYONU */
+        @keyframes shake {
+            0% { transform: translate(0, 0) rotate(0deg); }
+            20% { transform: translate(-8px, 6px) rotate(-1deg); }
+            40% { transform: translate(8px, -4px) rotate(1deg); }
+            60% { transform: translate(-6px, -6px) rotate(0deg); }
+            80% { transform: translate(6px, 4px) rotate(1deg); }
+            100% { transform: translate(0, 0) rotate(0deg); }
+        }
+        .screen-shake {
+            animation: shake 0.3s ease;
         }
     </style>
 </head>
 <body>
 
-    <!-- MENÜ EKRANI -->
+    <!-- MENÜ / LOBBY EKRANI -->
     <div id="lobby">
-        <div class="title">AMONG BATTLE LAN</div>
-        
-        <div class="input-group">
-            <label>OYUNCU İSMİNİZ</label>
-            <input type="text" id="playerNameInput" maxlength="12" value="Oyuncu">
+        <div class="title">AMONG BATTLE ARENA</div>
+
+        <!-- 1. AŞAMA: Odayı Kur veya Katıl -->
+        <div id="setup-section" class="screen-section">
+            <button id="host-btn" class="btn">ODA KUR (QR OLUŞTUR)</button>
+            <div id="qr-box"></div>
+            <div id="status">Bekleniyor...</div>
         </div>
 
-        <div class="input-group">
-            <label>KARAKTER RENGİ</label>
-            <div class="color-picker">
-                <div class="color-opt selected" data-color="#ff3333" style="background:#ff3333;"></div>
-                <div class="color-opt" data-color="#3399ff" style="background:#3399ff;"></div>
-                <div class="color-opt" data-color="#28a745" style="background:#28a745;"></div>
-                <div class="color-opt" data-color="#ffcc00" style="background:#ffcc00;"></div>
-                <div class="color-opt" data-color="#a020f0" style="background:#a020f0;"></div>
+        <!-- 2. AŞAMA: Bağlandıktan Sonra İsim ve Renk Seçimi -->
+        <div id="custom-section" class="screen-section" style="display:none;">
+            <div id="connection-success-msg" style="color: #00ffcc; font-weight: bold; margin-bottom: 15px; font-size: 18px;">BAĞLANTI BAŞARILI!</div>
+            
+            <div class="input-group">
+                <label>OYUNCU İSMİNİZ</label>
+                <input type="text" id="playerNameInput" maxlength="12" value="Oyuncu">
             </div>
-        </div>
 
-        <button id="host-btn" class="btn">ODA KUR (QR OLUŞTUR)</button>
-        <div id="qr-box"></div>
-        <div id="status">Oyuncu bekleniyor...</div>
+            <div class="input-group">
+                <label>KARAKTER RENGİ</label>
+                <div class="color-picker">
+                    <div class="color-opt selected" data-color="#ff3333" style="background:#ff3333;"></div>
+                    <div class="color-opt" data-color="#3399ff" style="background:#3399ff;"></div>
+                    <div class="color-opt" data-color="#28a745" style="background:#28a745;"></div>
+                    <div class="color-opt" data-color="#ffcc00" style="background:#ffcc00;"></div>
+                    <div class="color-opt" data-color="#a020f0" style="background:#a020f0;"></div>
+                </div>
+            </div>
+
+            <button id="ready-btn" class="btn">OYUNA BAŞLA</button>
+        </div>
     </div>
 
     <!-- OYUN ALANI -->
@@ -285,12 +320,13 @@
         <!-- BİTİŞ EKRANI -->
         <div id="game-over-screen">
             <div id="winnerText">KAZANAN</div>
+            <div id="restartStatus">Tekrar oynamak için ikiniz de butona basın!</div>
             <button id="restartBtn" class="btn">TEKRAR OYNA</button>
         </div>
     </div>
 
     <script>
-        // Çift dokunma yakınlaştırmasını tarayıcı seviyesinde tam engelleme
+        // Tarayıcı çift dokunma yakınlaştırmasını önleme
         document.addEventListener('touchstart', (e) => {
             if (e.touches.length > 1) e.preventDefault();
         }, { passive: false });
@@ -298,9 +334,7 @@
         let lastTouchEnd = 0;
         document.addEventListener('touchend', (e) => {
             const now = (new Date()).getTime();
-            if (now - lastTouchEnd <= 300) {
-                e.preventDefault();
-            }
+            if (now - lastTouchEnd <= 300) e.preventDefault();
             lastTouchEnd = now;
         }, false);
 
@@ -319,7 +353,81 @@
             canvas.height = screenH;
         });
 
-        // RENK SEÇİMİ MANTIĞI
+        // ---------------- WEB AUDIO API SES MOTORU ----------------
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // Arka Plan Müziği (Aksiyon ritmi - Synth Melodisi)
+        let bgmTimer = null;
+        function startBGM() {
+            if (bgmTimer) return;
+            const notes = [110, 130.81, 146.83, 164.81]; // Düşük bas frekansları
+            let step = 0;
+            bgmTimer = setInterval(() => {
+                if (!gameRunning || gameOver) return;
+                initAudio();
+                try {
+                    let osc = audioCtx.createOscillator();
+                    let gain = audioCtx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(notes[step % notes.length], audioCtx.currentTime);
+                    
+                    gain.gain.setValueAtTime(0.04, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
+
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.2);
+                    step++;
+                } catch(e) {}
+            }, 300);
+        }
+
+        function stopBGM() {
+            if (bgmTimer) {
+                clearInterval(bgmTimer);
+                bgmTimer = null;
+            }
+        }
+
+        // Vurma Sesi (Tok darbe efekti)
+        function playHitSound() {
+            initAudio();
+            try {
+                let osc = audioCtx.createOscillator();
+                let gain = audioCtx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + 0.15);
+
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.15);
+            } catch(e) {}
+        }
+
+        // Ekran Titretme Fonksiyonu
+        function triggerScreenShake() {
+            const container = document.getElementById('game-container');
+            container.classList.remove('screen-shake');
+            void container.offsetWidth; // Reflow tetikle
+            container.classList.add('screen-shake');
+        }
+
+        // RENK SEÇİMİ
         let selectedColor = '#ff3333';
         document.querySelectorAll('.color-opt').forEach(opt => {
             opt.addEventListener('click', () => {
@@ -329,20 +437,20 @@
             });
         });
 
-        // OYUN AKTÖRLERİ VE DURUMU
+        // OYUN DURUMU VE AKTÖRLERİ
         let isHost = false;
         let peer, conn;
         let gameRunning = false;
         let gameOver = false;
 
         let players = {
-            p1: { name: 'Oyuncu 1', x: 150, y: screenH / 2, vx: 0, vy: 0, hp: 100, color: '#ff3333', facing: 'right', isAttacking: false, attackTimer: 0 },
-            p2: { name: 'Oyuncu 2', x: screenW - 150, y: screenH / 2, vx: 0, vy: 0, hp: 100, color: '#3399ff', facing: 'left', isAttacking: false, attackTimer: 0 }
+            p1: { name: 'Oyuncu 1', x: 150, y: screenH / 2, vx: 0, vy: 0, hp: 100, color: '#ff3333', facing: 'right', isAttacking: false, attackTimer: 0, ready: false },
+            p2: { name: 'Oyuncu 2', x: screenW - 150, y: screenH / 2, vx: 0, vy: 0, hp: 100, color: '#3399ff', facing: 'left', isAttacking: false, attackTimer: 0, ready: false }
         };
 
         let myRole = 'p1';
 
-        // PEERJS VE QR KOD MANTIĞI
+        // URL ile QR Katılım Kontrolü
         const urlParams = new URLSearchParams(window.location.search);
         const joinId = urlParams.get('join');
 
@@ -354,6 +462,7 @@
         }
 
         document.getElementById('host-btn').onclick = () => {
+            initAudio();
             document.getElementById('host-btn').style.display = 'none';
             isHost = true;
             myRole = 'p1';
@@ -396,19 +505,10 @@
 
         function setupConnection() {
             conn.on('open', () => {
-                // Oyuncu isim ve renk bilgilerini gönder
-                if (isHost) {
-                    players.p1.name = getMyName();
-                    players.p1.color = selectedColor;
-                } else {
-                    conn.send({ type: 'init_info', name: getMyName(), color: selectedColor });
-                }
-
-                document.getElementById('lobby').style.display = 'none';
-                document.getElementById('game-container').style.display = 'block';
-                gameRunning = true;
-                gameOver = false;
-                requestAnimationFrame(gameLoop);
+                // Bağlantı sağlandığında ilk menüyü gizle, isim/renk seçim ekranını aç
+                document.getElementById('setup-section').style.display = 'none';
+                document.getElementById('custom-section').style.display = 'flex';
+                document.getElementById('status').innerText = "";
             });
 
             conn.on('data', (data) => {
@@ -418,10 +518,19 @@
                     if (data.gameOver) {
                         triggerGameOverScreen(data.winnerText);
                     }
-                } else if (data.type === 'init_info') {
+                } else if (data.type === 'player_config') {
+                    // Karşı tarafın isim ve renk ayarını kaydet
                     if (isHost) {
                         players.p2.name = data.name;
                         players.p2.color = data.color;
+                    } else {
+                        players.p1.name = data.name;
+                        players.p1.color = data.color;
+                    }
+                } else if (data.type === 'ready_signal') {
+                    if (isHost) {
+                        players.p2.ready = true;
+                        checkBothReady();
                     }
                 } else if (data.type === 'input') {
                     if (isHost && !gameOver) {
@@ -431,10 +540,56 @@
                             triggerAttack('p2');
                         }
                     }
-                } else if (data.type === 'restart') {
-                    resetMatch();
+                } else if (data.type === 'restart_ready') {
+                    if (isHost) {
+                        players.p2.ready = true;
+                        checkRestartBothReady();
+                    }
                 }
             });
+        }
+
+        // OYUNA BAŞLA (LOBBY HAZIR BUTONU)
+        document.getElementById('ready-btn').onclick = () => {
+            initAudio();
+            let myName = getMyName();
+            let myColor = selectedColor;
+
+            if (isHost) {
+                players.p1.name = myName;
+                players.p1.color = myColor;
+                players.p1.ready = true;
+                if (conn && conn.open) {
+                    conn.send({ type: 'player_config', name: myName, color: myColor });
+                    conn.send({ type: 'ready_signal' });
+                }
+                checkBothReady();
+            } else {
+                players.p2.name = myName;
+                players.p2.color = myColor;
+                players.p2.ready = true;
+                if (conn && conn.open) {
+                    conn.send({ type: 'player_config', name: myName, color: myColor });
+                    conn.send({ type: 'ready_signal' });
+                }
+                document.getElementById('ready-btn').innerText = "Rakip Bekleniyor...";
+                document.getElementById('ready-btn').style.opacity = "0.6";
+            }
+        };
+
+        function checkBothReady() {
+            if (players.p1.ready && players.p2.ready) {
+                startTheGame();
+            }
+        }
+
+        function startTheGame() {
+            document.getElementById('lobby').style.display = 'none';
+            document.getElementById('game-container').style.display = 'block';
+            gameRunning = true;
+            gameOver = false;
+            startBGM();
+            requestAnimationFrame(gameLoop);
         }
 
         function updateHUD() {
@@ -452,18 +607,39 @@
         // BİTİŞ EKRANI
         function triggerGameOverScreen(winnerText) {
             gameOver = true;
+            stopBGM();
             document.getElementById('winnerText').innerText = winnerText;
+            document.getElementById('restartStatus').innerText = "Tekrar oynamak için ikiniz de butona basın!";
+            document.getElementById('restartBtn').innerText = "TEKRAR OYNA";
+            document.getElementById('restartBtn').style.opacity = "1";
+            document.getElementById('restartBtn').disabled = false;
             document.getElementById('game-over-screen').style.display = 'flex';
         }
 
-        // TEKRAR OYNA BUTONU
+        // TEKRAR OYNA BUTONU (İki taraflı onay mekanizması)
         document.getElementById('restartBtn').onclick = () => {
+            initAudio();
+            document.getElementById('restartBtn').innerText = "Rakip Bekleniyor...";
+            document.getElementById('restartBtn').style.opacity = "0.6";
+            document.getElementById('restartBtn').disabled = true;
+
+            players[myRole].ready = true;
+
             if (isHost) {
-                resetMatch();
+                checkRestartBothReady();
             } else if (conn && conn.open) {
-                conn.send({ type: 'restart' });
+                conn.send({ type: 'restart_ready' });
             }
         };
+
+        function checkRestartBothReady() {
+            if (players.p1.ready && players.p2.ready) {
+                // Her iki taraf da hazır, maçı sıfırla
+                players.p1.ready = false;
+                players.p2.ready = false;
+                resetMatch();
+            }
+        }
 
         function resetMatch() {
             gameOver = false;
@@ -476,12 +652,14 @@
             players.p2.y = screenH / 2;
             players.p1.vx = 0; players.p1.vy = 0;
             players.p2.vx = 0; players.p2.vy = 0;
+            
+            startBGM();
             if (isHost && conn && conn.open) {
-                conn.send({ type: 'state', players: players, gameOver: false });
+                conn.send({ type: 'state', players: players, gameOver: false, winnerText: '' });
             }
         }
 
-        // ÇOKLU DOKUNMA (MULTI-TOUCH) VE JOYSTICK SİSTEMİ
+        // ÇOKLU DOKUNMA VE JOYSTICK SİSTEMİ
         const joyZone = document.getElementById('joystick-zone');
         const joyKnob = document.getElementById('joystick-knob');
         let joyPointerId = null;
@@ -563,6 +741,9 @@
             p.isAttacking = true;
             p.attackTimer = 15;
 
+            playHitSound();
+            triggerScreenShake();
+
             let enemyRole = role === 'p1' ? 'p2' : 'p1';
             let enemy = players[enemyRole];
 
@@ -570,7 +751,7 @@
             let dy = enemy.y - p.y;
             let dist = Math.hypot(dx, dy);
 
-            if (dist < 65) {
+            if (dist < 70) {
                 enemy.hp -= 10;
                 if (enemy.hp <= 0) {
                     enemy.hp = 0;
@@ -609,7 +790,7 @@
             updateHUD();
         }
 
-        // ÇİZİM MOTORU
+        // ÇİZİM MOTORU (GÖLGELER, ANİMASYONLU SALDIRI EFEKTİ)
         function drawCrewmate(p) {
             ctx.save();
             ctx.translate(p.x, p.y);
@@ -623,7 +804,7 @@
             if (p.facing === 'left') ctx.scale(-1, 1);
 
             // Gölge
-            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            ctx.fillStyle = 'rgba(0,0,0,0.4)';
             ctx.beginPath();
             ctx.ellipse(0, 20, 18, 7, 0, 0, Math.PI * 2);
             ctx.fill();
@@ -638,9 +819,10 @@
             ctx.rect(-16, -5, 32, 22);
             ctx.fill();
 
-            // Bacaklar
-            ctx.fillRect(-14, 15, 10, 10);
-            ctx.fillRect(4, 15, 10, 10);
+            // Bacaklar (Yürüme Efekti İçin Hafif Titreşim)
+            let legOffset = (Math.abs(p.vx) > 0.1 || Math.abs(p.vy) > 0.1) ? Math.sin(Date.now() / 60) * 4 : 0;
+            ctx.fillRect(-14, 15 + legOffset, 8, 10);
+            ctx.fillRect(4, 15 - legOffset, 8, 10);
 
             // Vizör
             ctx.fillStyle = '#aaddff';
@@ -651,12 +833,12 @@
             ctx.lineWidth = 1.5;
             ctx.stroke();
 
-            // Saldırı Efekti
+            // Saldırı Kılıç/Savurma Efekti Animasyonu
             if (p.isAttacking) {
-                ctx.strokeStyle = '#ffcc00';
-                ctx.lineWidth = 4;
+                ctx.strokeStyle = '#ffff00';
+                ctx.lineWidth = 5;
                 ctx.beginPath();
-                ctx.arc(10, 0, 30, -Math.PI / 4, Math.PI / 4);
+                ctx.arc(15, 0, 35, -Math.PI / 3, Math.PI / 3);
                 ctx.stroke();
             }
 
