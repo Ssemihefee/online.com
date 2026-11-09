@@ -2,99 +2,106 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tek Tıkla İki Kişilik Oyun</title>
-    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    <title>Uzay Kaçışı Oyunu</title>
     <style>
-        body { background: #111; color: #fff; text-align: center; font-family: Arial, sans-serif; margin: 0; padding: 20px; }
-        #menu { background: #222; padding: 20px; border-radius: 10px; display: inline-block; margin-top: 20px; }
-        button { background: #28a745; color: white; border: none; padding: 15px 30px; font-size: 20px; border-radius: 8px; cursor: pointer; }
-        canvas { background: #000; border: 3px solid #fff; display: block; margin: 20px auto; touch-action: none; max-width: 100%; }
-        #durum { font-size: 20px; color: yellow; margin: 15px; font-weight: bold; }
+        body {
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background-color: #1a1a2e;
+            color: #ffffff;
+            font-family: Arial, sans-serif;
+        }
+        canvas {
+            border: 3px solid #0f3460;
+            background-color: #16213e;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+        h1 { margin-bottom: 10px; font-size: 24px; }
+        p { margin-top: 10px; color: #a2a8d3; }
     </style>
 </head>
 <body>
 
-    <h1>Tek Tıkla Karşılıklı Oyun</h1>
-    
-    <div id="menu">
-        <p>İki telefonda da bu sayfayı aç ve aşağıdaki tuşa bas:</p>
-        <button id="baslaBtn">OYUNA BAŞLA</button>
-    </div>
-
-    <div id="durum">Bekleniyor...</div>
-    <canvas id="oyun" width="350" height="350"></canvas>
+    <h1>Uzay Kaçışı - Skor: <span id="skor">0</span></h1>
+    <canvas id="oyunAlani" width="400" height="500"></canvas>
+    <p>Kontroller: Sağ ve Sol Ok Tuşları | Yeniden Başlamak için: F5</p>
 
     <script>
-        const canvas = document.getElementById("oyun");
+        const canvas = document.getElementById("oyunAlani");
         const ctx = canvas.getContext("2d");
+        const skorElement = document.getElementById("skor");
 
-        let peer, conn;
-        let benimKarem = { x: 50, y: 50, renk: "red" };
-        let digerKarem = { x: 200, y: 200, renk: "blue" };
+        let oyuncu = { x: 180, y: 440, genislik: 40, yukseklik: 40, hiz: 6 };
+        let engeller = [];
+        let skor = 0;
+        let oyunBitti = false;
+        let tuslar = {};
 
-        // Sabit ve ortak bir oda ismi üretiyoruz (Aynı Wi-Fi'dakiler otomatik buluşsun diye)
-        // Telefonların tarayıcı saatine göre ortak bir saniye aralığı kullanıyoruz
-        document.getElementById("baslaBtn").addEventListener("click", () => {
-            document.getElementById("durum").innerText = "Bağlanıyor...";
-            document.getElementById("menu").style.display = "none";
+        document.addEventListener("keydown", (e) => tuslar[e.key] = true);
+        document.addEventListener("keyup", (e) => tuslar[e.key] = false);
 
-            // Rastgele bir ID yerine sabit ortak kanal açıyoruz
-            peer = new Peer("lanoyunu-ortak-oda-12345");
-
-            peer.on("open", (id) => {
-                // Eğer bu ID'yi alan ilk cihazsa (Sunucu)
-                document.getElementById("durum").innerText = "Oda Kuruldu! 2. cihaz bekleniyor...";
-            });
-
-            peer.on("error", (err) => {
-                // Eğer bu ID'yi zaten başka biri (1. cihaz) aldıysa, o zaman 2. cihaz olarak bağlan
-                baglanIkinciCihaz();
-            });
-        });
-
-        function baglanIkinciCihaz() {
-            peer = new Peer(); // Yeni rastgele kimlik al
-            peer.on("open", () => {
-                conn = peer.connect("lanoyunu-ortak-oda-12345");
-                baglantiAyarla();
-            });
+        function engelOlustur() {
+            if (oyunBitti) return;
+            let genislik = Math.random() * 60 + 30;
+            let x = Math.random() * (canvas.width - genislik);
+            engeller.push({ x: x, y: -30, genislik: genislik, yukseklik: 20, hiz: 3 + (skor * 0.1) });
         }
 
-        // 1. Cihaz bağlanan kişiyi yakalarsa
-        peer && peer.on("connection", (connection) => {
-            conn = connection;
-            baglantiAyarla();
-        });
+        function guncelle() {
+            if (oyunBitti) return;
 
-        function baglantiAyarla() {
-            document.getElementById("durum").innerText = "BAĞLANDI! OYNAYABİLİRSİNİZ.";
-            
-            conn.on("data", (data) => {
-                digerKarem.x = data.x;
-                digerKarem.y = data.y;
-            });
-        }
+            if (tuslar["ArrowLeft"] && oyuncu.x > 0) oyuncu.x -= oyuncu.hiz;
+            if (tuslar["ArrowRight"] && oyuncu.x < canvas.width - oyuncu.genislik) oyuncu.x += oyuncu.hiz;
 
-        canvas.addEventListener("pointerdown", (e) => {
-            const rect = canvas.getBoundingClientRect();
-            benimKarem.x = e.clientX - rect.left;
-            benimKarem.y = e.clientY - rect.top;
+            for (let i = 0; i < engeller.length; i++) {
+                let e = engeller[i];
+                e.y += e.hiz;
 
-            if (conn && conn.open) {
-                conn.send({ x: benimKarem.x, y: benimKarem.y });
+                // Çarpışma kontrolü
+                if (oyuncu.x < e.x + e.genislik &&
+                    oyuncu.x + oyuncu.genislik > e.x &&
+                    oyuncu.y < e.y + e.yukseklik &&
+                    oyuncu.y + oyuncu.yukseklik > e.y) {
+                    oyunBitti = true;
+                    alert("Oyun Bitti! Skorunuz: " + skor);
+                }
+
+                // Ekrandan çıkan engelleri temizle ve puan ekle
+                if (e.y > canvas.height) {
+                    engeller.splice(i, 1);
+                    skor++;
+                    skorElement.innerText = skor;
+                    i--;
+                }
             }
-        });
+        }
 
         function ciz() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = benimKarem.renk;
-            ctx.fillRect(benimKarem.x - 15, benimKarem.y - 15, 30, 30);
-            ctx.fillStyle = digerKarem.renk;
-            ctx.fillRect(digerKarem.x - 15, digerKarem.y - 15, 30, 30);
-            requestAnimationFrame(ciz);
+
+            // Oyuncuyu çiz
+            ctx.fillStyle = "#e94560";
+            ctx.fillRect(oyuncu.x, oyuncu.y, oyuncu.genislik, oyuncu.yukseklik);
+
+            // Engelleri çiz
+            ctx.fillStyle = "#4ecca3";
+            for (let e of engeller) {
+                ctx.fillRect(e.x, e.y, e.genislik, e.yukseklik);
+            }
         }
-        ciz();
+
+        function oyunDongusu() {
+            guncelle();
+            ciz();
+            if (!oyunBitti) requestAnimationFrame(oyunDongusu);
+        }
+
+        setInterval(engelOlustur, 900);
+        oyunDongusu();
     </script>
 </body>
 </html>
