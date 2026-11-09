@@ -3,33 +3,97 @@
 <head>
     <meta charset="UTF-8">
     <title>LAN İki Kişilik Oyun</title>
+    <!-- İnternet üzerinden bağlantı ID'si oluşturmak için PeerJS kütüphanesini çekiyoruz -->
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
     <style>
-        body { text-align: center; font-family: sans-serif; background: #222; color: #fff; margin-top: 50px; }
-        canvas { background: #111; border: 2px solid #fff; }
+        body { text-align: center; font-family: sans-serif; background: #222; color: #fff; margin-top: 20px; }
+        canvas { background: #111; border: 2px solid #fff; touch-action: none; }
+        button, input { padding: 10px; font-size: 16px; margin: 5px; }
     </style>
 </head>
 <body>
-    <h1>Mini LAN Oyunu</h1>
-    <p>Kutuya dokunarak hareket ettir!</p>
-    <canvas id="oyun" width="400" height="400"></canvas>
+    <h1>LAN İki Kişilik Oyun</h1>
+    
+    <div id="menu">
+        <button id="sunucuOlustur">1. Cihaz (Oda Kur)</button>
+        <br>
+        <input type="text" id="odaKodu" placeholder="Oda Kodunu Gir">
+        <button id="baglan">2. Cihaz (Oyuna Katıl)</button>
+    </div>
+
+    <h3 id="durum">Bağlantı Bekleniyor...</h3>
+    <canvas id="oyun" width="350" height="350"></canvas>
 
     <script>
         const canvas = document.getElementById("oyun");
         const ctx = canvas.getContext("2d");
 
-        let x = 200, y = 200;
+        let peer, conn;
+        let benimKarem = { x: 50, y: 50, renk: "red" };
+        let digerKarem = { x: 200, y: 200, renk: "blue" };
+        let rol = ""; // "host" veya "client"
 
-        // Ekrana dokunulduğunda kutuyu hareket ettir
-        canvas.addEventListener("click", (e) => {
+        // 1. Cihaz Oda Kurar
+        document.getElementById("sunucuOlustur").addEventListener("click", () => {
+            peer = new Peer(); // Rastgele bir oda ID'si oluşturur
+            peer.on("open", (id) => {
+                document.getElementById("durum").innerText = "Oda Kodun: " + id + " (Bu kodu diğer cihaza yaz)";
+                rol = "host";
+            });
+
+            peer.on("connection", (connection) => {
+                conn = connection;
+                setupConnection();
+                document.getElementById("menu").style.display = "none";
+                document.getElementById("durum").innerText = "Bağlantı Başarılı! Oyna.";
+            });
+        });
+
+        // 2. Cihaz Odaya Katılır
+        document.getElementById("baglan").addEventListener("click", () => {
+            const kod = document.getElementById("odaKodu").value;
+            peer = new Peer();
+            
+            peer.on("open", () => {
+                conn = peer.connect(kod);
+                setupConnection();
+                document.getElementById("menu").style.display = "none";
+                document.getElementById("durum").innerText = "Bağlantı Başarılı! Oyna.";
+                rol = "client";
+            });
+        });
+
+        function setupConnection() {
+            conn.on("data", (data) => {
+                // Diğer cihazdan gelen koordinatları al
+                digerKarem.x = data.x;
+                digerKarem.y = data.y;
+            });
+        }
+
+        // Ekrana dokunarak kendi kareni hareket ettir
+        canvas.addEventListener("pointerdown", (e) => {
             const rect = canvas.getBoundingClientRect();
-            x = e.clientX - rect.left;
-            y = e.clientY - rect.top;
+            benimKarem.x = e.clientX - rect.left;
+            benimKarem.y = e.clientY - rect.top;
+
+            // Yerini diğer cihaza anında gönder
+            if (conn && conn.open) {
+                conn.send({ x: benimKarem.x, y: benimKarem.y });
+            }
         });
 
         function ciz() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = "red";
-            ctx.fillRect(x - 15, y - 15, 30, 30);
+
+            // Kırmızı kareyi çiz
+            ctx.fillStyle = benimKarem.renk;
+            ctx.fillRect(benimKarem.x - 15, benimKarem.y - 15, 30, 30);
+
+            // Mavi kareyi çiz
+            ctx.fillStyle = digerKarem.renk;
+            ctx.fillRect(digerKarem.x - 15, digerKarem.y - 15, 30, 30);
+
             requestAnimationFrame(ciz);
         }
         ciz();
