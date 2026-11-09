@@ -2,106 +2,138 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>Uzay Kaçışı Oyunu</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Net LAN Oyunu</title>
     <style>
-        body {
-            margin: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            background-color: #1a1a2e;
-            color: #ffffff;
-            font-family: Arial, sans-serif;
-        }
-        canvas {
-            border: 3px solid #0f3460;
-            background-color: #16213e;
-            box-shadow: 0 0 20px rgba(0,0,0,0.5);
-        }
-        h1 { margin-bottom: 10px; font-size: 24px; }
-        p { margin-top: 10px; color: #a2a8d3; }
+        body { background: #111; color: #fff; text-align: center; font-family: Arial, sans-serif; margin: 0; padding: 10px; }
+        .kutu { background: #222; padding: 15px; margin: 10px auto; border-radius: 8px; max-width: 350px; }
+        button { background: #28a745; color: white; border: none; padding: 10px 15px; font-size: 16px; border-radius: 5px; cursor: pointer; margin: 5px; }
+        .btn2 { background: #007bff; }
+        textarea { width: 90%; height: 50px; background: #333; color: #fff; border: 1px solid #555; font-size: 10px; }
+        canvas { background: #000; border: 2px solid #fff; display: block; margin: 10px auto; touch-action: none; }
+        #durum { font-size: 16px; color: yellow; font-weight: bold; margin: 5px; }
     </style>
 </head>
 <body>
 
-    <h1>Uzay Kaçışı - Skor: <span id="skor">0</span></h1>
-    <canvas id="oyunAlani" width="400" height="500"></canvas>
-    <p>Kontroller: Sağ ve Sol Ok Tuşları | Yeniden Başlamak için: F5</p>
+    <h3>İki Kişilik LAN Oyunu</h3>
+    <div id="durum">Durum: Bekleniyor...</div>
+
+    <div id="menu">
+        <div class="kutu">
+            <p><b>1. Cihaz İşlemi:</b></p>
+            <button id="kurBtn">1. Oda Kodu Üret</button>
+            <br>
+            <textarea id="kod1" placeholder="Çıkan kodu kopyala"></textarea>
+        </div>
+
+        <div class="kutu">
+            <p><b>2. Cihaz İşlemi:</b></p>
+            <textarea id="kod2" placeholder="1. cihazın kodunu buraya yapıştır"></textarea>
+            <br>
+            <button id="baglanBtn" class="btn2">2. Bağlan ve Onayla</button>
+            <br>
+            <textarea id="cevapKodu" placeholder="Burada çıkan kodu 1. cihaza geri götür"></textarea>
+        </div>
+        
+        <div class="kutu" id="sonAdim" style="display:none;">
+            <p><b>Son Adım (1. Cihaz İçin):</b></p>
+            <textarea id="sonKod" placeholder="2. cihazdan gelen kodu buraya yapıştır"></textarea>
+            <br>
+            <button id="bitirBtn" class="btn2">Oyunu Başlat</button>
+        </div>
+    </div>
+
+    <canvas id="oyun" width="320" height="320"></canvas>
 
     <script>
-        const canvas = document.getElementById("oyunAlani");
+        const canvas = document.getElementById("oyun");
         const ctx = canvas.getContext("2d");
-        const skorElement = document.getElementById("skor");
 
-        let oyuncu = { x: 180, y: 440, genislik: 40, yukseklik: 40, hiz: 6 };
-        let engeller = [];
-        let skor = 0;
-        let oyunBitti = false;
-        let tuslar = {};
+        let pc = new RTCPeerConnection({ iceServers: [] });
+        let dataChannel;
 
-        document.addEventListener("keydown", (e) => tuslar[e.key] = true);
-        document.addEventListener("keyup", (e) => tuslar[e.key] = false);
+        let ben = { x: 50, y: 50, renk: "red" };
+        let diger = { x: 200, y: 200, renk: "blue" };
 
-        function engelOlustur() {
-            if (oyunBitti) return;
-            let genislik = Math.random() * 60 + 30;
-            let x = Math.random() * (canvas.width - genislik);
-            engeller.push({ x: x, y: -30, genislik: genislik, yukseklik: 20, hiz: 3 + (skor * 0.1) });
+        // 1. CİHAZ: Oda Kodunu Üretir
+        document.getElementById("kurBtn").onclick = async () => {
+            dataChannel = pc.createDataChannel("oyun");
+            kanalAyarla();
+
+            let offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+
+            pc.onicecandidate = (e) => {
+                if (!e.candidate) {
+                    document.getElementById("kod1").value = JSON.stringify(pc.localDescription);
+                    document.getElementById("durum").innerText = "Kod üretildi. 2. cihaza gönder.";
+                }
+            };
+        };
+
+        // 2. CİHAZ: Kodu Yapar ve Cevap Üretir
+        document.getElementById("baglanBtn").onclick = async () => {
+            let val = document.getElementById("kod2").value.trim();
+            if(!val) return alert("Kodu boş bırakma!");
+
+            pc.ondatachannel = (e) => {
+                dataChannel = e.channel;
+                kanalAyarla();
+            };
+
+            await pc.setRemoteDescription(JSON.parse(val));
+            let answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+
+            pc.onicecandidate = (e) => {
+                if (!e.candidate) {
+                    document.getElementById("cevapKodu").value = JSON.stringify(pc.localDescription);
+                    document.getElementById("durum").innerText = "Cevap üretildi. 1. cihaza geri götür.";
+                    document.getElementById("sonAdim").style.display = "block";
+                }
+            };
+        };
+
+        // 1. CİHAZ: 2. Cihazdan Gelen Cevabı Onaylar
+        document.getElementById("bitirBtn").onclick = async () => {
+            let val = document.getElementById("sonKod").value.trim();
+            if(!val) return alert("Kodu boş bırakma!");
+
+            await pc.setRemoteDescription(JSON.parse(val));
+            document.getElementById("durum").innerText = "Bağlantı kuruluyor...";
+        };
+
+        function kanalAyarla() {
+            dataChannel.onopen = () => {
+                document.getElementById("durum").innerText = "BAĞLANDI! OYNAYABİLİRSİNİZ.";
+                document.getElementById("menu").style.display = "none";
+            };
+            dataChannel.onmessage = (e) => {
+                let d = JSON.parse(e.data);
+                diger.x = d.x;
+                diger.y = d.y;
+            };
         }
 
-        function guncelle() {
-            if (oyunBitti) return;
-
-            if (tuslar["ArrowLeft"] && oyuncu.x > 0) oyuncu.x -= oyuncu.hiz;
-            if (tuslar["ArrowRight"] && oyuncu.x < canvas.width - oyuncu.genislik) oyuncu.x += oyuncu.hiz;
-
-            for (let i = 0; i < engeller.length; i++) {
-                let e = engeller[i];
-                e.y += e.hiz;
-
-                // Çarpışma kontrolü
-                if (oyuncu.x < e.x + e.genislik &&
-                    oyuncu.x + oyuncu.genislik > e.x &&
-                    oyuncu.y < e.y + e.yukseklik &&
-                    oyuncu.y + oyuncu.yukseklik > e.y) {
-                    oyunBitti = true;
-                    alert("Oyun Bitti! Skorunuz: " + skor);
-                }
-
-                // Ekrandan çıkan engelleri temizle ve puan ekle
-                if (e.y > canvas.height) {
-                    engeller.splice(i, 1);
-                    skor++;
-                    skorElement.innerText = skor;
-                    i--;
-                }
+        canvas.onclick = (e) => {
+            let r = canvas.getBoundingClientRect();
+            ben.x = e.clientX - r.left;
+            ben.y = e.clientY - r.top;
+            if (dataChannel && dataChannel.readyState === "open") {
+                dataChannel.send(JSON.stringify({ x: ben.x, y: ben.y }));
             }
-        }
+        };
 
-        function ciz() {
+        function dongu() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // Oyuncuyu çiz
-            ctx.fillStyle = "#e94560";
-            ctx.fillRect(oyuncu.x, oyuncu.y, oyuncu.genislik, oyuncu.yukseklik);
-
-            // Engelleri çiz
-            ctx.fillStyle = "#4ecca3";
-            for (let e of engeller) {
-                ctx.fillRect(e.x, e.y, e.genislik, e.yukseklik);
-            }
+            ctx.fillStyle = ben.renk;
+            ctx.fillRect(ben.x - 10, ben.y - 10, 20, 20);
+            ctx.fillStyle = diger.renk;
+            ctx.fillRect(diger.x - 10, diger.y - 10, 20, 20);
+            requestAnimationFrame(dongu);
         }
-
-        function oyunDongusu() {
-            guncelle();
-            ciz();
-            if (!oyunBitti) requestAnimationFrame(oyunDongusu);
-        }
-
-        setInterval(engelOlustur, 900);
-        oyunDongusu();
+        dongu();
     </script>
 </body>
 </html>
