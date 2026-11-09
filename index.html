@@ -339,17 +339,18 @@
             canvas.height = screenH;
         });
 
-        // SES MOTORU (Web Audio API)
+        // ORTA ÇAĞ / ORGANİK SES MOTORU (Web Audio API)
         let audioCtx = null;
         function initAudio() {
             if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             if (audioCtx.state === 'suspended') audioCtx.resume();
         }
 
+        // Orta Çağ Taverna / Heyecanlı Melodi (Organik Flüt/Lüt Benzeri Sesler)
         let bgmTimer = null;
         function startBGM() {
             if (bgmTimer) return;
-            const notes = [110, 130.81, 146.83, 164.81];
+            const medievalNotes = [130.81, 146.83, 164.81, 196.00, 220.00]; // Doğal gam
             let step = 0;
             bgmTimer = setInterval(() => {
                 if (!gameRunning || gameOver) return;
@@ -357,56 +358,85 @@
                 try {
                     let osc = audioCtx.createOscillator();
                     let gain = audioCtx.createGain();
-                    osc.type = 'sawtooth';
-                    osc.frequency.setValueAtTime(notes[step % notes.length], audioCtx.currentTime);
-                    gain.gain.setValueAtTime(0.03, audioCtx.currentTime);
-                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
+                    osc.type = 'triangle'; // Mekanik olmayan yumuşak organik dalga
+                    osc.frequency.setValueAtTime(medievalNotes[step % medievalNotes.length], audioCtx.currentTime);
+                    
+                    gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.35);
+
                     osc.connect(gain);
                     gain.connect(audioCtx.destination);
                     osc.start();
-                    osc.stop(audioCtx.currentTime + 0.2);
+                    osc.stop(audioCtx.currentTime + 0.35);
                     step++;
                 } catch(e){}
-            }, 300);
+            }, 350);
         }
 
         function stopBGM() {
             if (bgmTimer) { clearInterval(bgmTimer); bgmTimer = null; }
         }
 
-        // 1. Boş Vuruş Sesi (Hafif Rüzgar/Savurma)
+        // Boşta Havayı Yarma Sesi (Rüzgar Hışırtısı)
         function playWhooshSound() {
             initAudio();
             try {
-                let osc = audioCtx.createOscillator();
+                let bufferSize = audioCtx.sampleRate * 0.1;
+                let buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                let output = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    output[i] = Math.random() * 2 - 1;
+                }
+
+                let whiteNoise = audioCtx.createBufferSource();
+                whiteNoise.buffer = buffer;
+
+                let filter = audioCtx.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.frequency.setValueAtTime(600, audioCtx.currentTime);
+                filter.Q.setValueAtTime(3, audioCtx.currentTime);
+
                 let gain = audioCtx.createGain();
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(300, audioCtx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(80, audioCtx.currentTime + 0.1);
-                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
-                osc.connect(gain);
+                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+
+                whiteNoise.connect(filter);
+                filter.connect(gain);
                 gain.connect(audioCtx.destination);
-                osc.start();
-                osc.stop(audioCtx.currentTime + 0.1);
+
+                whiteNoise.start();
             } catch(e){}
         }
 
-        // 2. Hasar Tutunca Çıkan Güçlü Darbe Sesi
+        // Orta Çağ Kılıç / Topuz Darbe Sesi (Tok ve Derin Çelik Sesi)
         function playHitSound() {
             initAudio();
             try {
                 let osc = audioCtx.createOscillator();
+                let osc2 = audioCtx.createOscillator();
                 let gain = audioCtx.createGain();
-                osc.type = 'square';
-                osc.frequency.setValueAtTime(220, audioCtx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.2);
-                gain.gain.setValueAtTime(0.35, audioCtx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
+
+                osc.type = 'sawtooth';
+                osc2.type = 'triangle';
+
+                // Metalik çınlama ve tok darbe kombinasyonu
+                osc.frequency.setValueAtTime(180, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.25);
+
+                osc2.frequency.setValueAtTime(90, audioCtx.currentTime);
+                osc2.frequency.exponentialRampToValueAtTime(20, audioCtx.currentTime + 0.25);
+
+                gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
+
                 osc.connect(gain);
+                osc2.connect(gain);
                 gain.connect(audioCtx.destination);
+
                 osc.start();
-                osc.stop(audioCtx.currentTime + 0.2);
+                osc2.start();
+                osc.stop(audioCtx.currentTime + 0.25);
+                osc2.stop(audioCtx.currentTime + 0.25);
             } catch(e){}
         }
 
@@ -480,6 +510,7 @@
 
         function setupConnection() {
             conn.on('open', () => {
+                // Bağlantı sağlandığı an iki cihazda da seçim ekranını aç
                 document.getElementById('setup-section').style.display = 'none';
                 document.getElementById('custom-section').style.display = 'flex';
                 document.getElementById('status').innerText = "";
@@ -494,7 +525,14 @@
                     if (isHost) { players.p2.name = data.name; players.p2.color = data.color; }
                     else { players.p1.name = data.name; players.p1.color = data.color; }
                 } else if (data.type === 'ready_signal') {
-                    if (isHost) { players.p2.ready = true; checkBothReady(); }
+                    if (isHost) {
+                        players.p2.ready = true;
+                        checkBothReady();
+                    } else {
+                        // Client tarafında rakip hazır sinyali geldiğinde butonu normalleştir
+                        document.getElementById('ready-btn').innerText = "OYUNA BAŞLA";
+                        document.getElementById('ready-btn').style.opacity = "1";
+                    }
                 } else if (data.type === 'input') {
                     if (isHost && !gameOver) {
                         players.p2.vx = data.vx;
@@ -502,7 +540,14 @@
                         if (data.attack && !players.p2.isAttacking) triggerAttack('p2');
                     }
                 } else if (data.type === 'restart_ready') {
-                    if (isHost) { players.p2.ready = true; checkRestartBothReady(); }
+                    if (isHost) {
+                        players.p2.ready = true;
+                        checkRestartBothReady();
+                    } else {
+                        document.getElementById('restartBtn').innerText = "TEKRAR OYNA";
+                        document.getElementById('restartBtn').style.opacity = "1";
+                        document.getElementById('restartBtn').disabled = false;
+                    }
                 }
             });
         }
@@ -512,30 +557,31 @@
             let myName = getMyName();
             let myColor = selectedColor;
 
+            players[myRole].name = myName;
+            players[myRole].color = myColor;
+            players[myRole].ready = true;
+
+            if (conn && conn.open) {
+                conn.send({ type: 'player_config', name: myName, color: myColor });
+                conn.send({ type: 'ready_signal' });
+            }
+
             if (isHost) {
-                players.p1.name = myName;
-                players.p1.color = myColor;
-                players.p1.ready = true;
-                if (conn && conn.open) {
-                    conn.send({ type: 'player_config', name: myName, color: myColor });
-                    conn.send({ type: 'ready_signal' });
-                }
                 checkBothReady();
             } else {
-                players.p2.name = myName;
-                players.p2.color = myColor;
-                players.p2.ready = true;
-                if (conn && conn.open) {
-                    conn.send({ type: 'player_config', name: myName, color: myColor });
-                    conn.send({ type: 'ready_signal' });
-                }
                 document.getElementById('ready-btn').innerText = "Rakip Bekleniyor...";
                 document.getElementById('ready-btn').style.opacity = "0.6";
             }
         };
 
         function checkBothReady() {
-            if (players.p1.ready && players.p2.ready) startTheGame();
+            if (players.p1.ready && players.p2.ready) {
+                // Host, state verisiyle birlikte client'a da oyunun başladığını bildirir
+                if (conn && conn.open) {
+                    conn.send({ type: 'state', players: players, gameOver: false, winnerText: '' });
+                }
+                startTheGame();
+            }
         }
 
         function startTheGame() {
@@ -688,7 +734,6 @@
             let dist = Math.hypot(dx, dy);
 
             if (dist < 75) {
-                // HASAR TUTTU -> Sert darbe sesi ve ekran sarsıntısı
                 playHitSound();
                 triggerScreenShake();
                 enemy.hp -= 10;
@@ -697,7 +742,6 @@
                     triggerGameOverScreen(p.name + " KAZANDI!");
                 }
             } else {
-                // BOŞA SALLANDI -> Hafif savurma sesi
                 playWhooshSound();
             }
         }
