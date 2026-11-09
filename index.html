@@ -2,100 +2,126 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LAN İki Kişilik Oyun</title>
-    <!-- İnternet üzerinden bağlantı ID'si oluşturmak için PeerJS kütüphanesini çekiyoruz -->
+    <!-- PeerJS kütüphanesini çağırıyoruz -->
     <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
     <style>
-        body { text-align: center; font-family: sans-serif; background: #222; color: #fff; margin-top: 20px; }
-        canvas { background: #111; border: 2px solid #fff; touch-action: none; }
-        button, input { padding: 10px; font-size: 16px; margin: 5px; }
+        body { background: #111; color: #fff; text-align: center; font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+        #menu { background: #222; padding: 20px; border-radius: 10px; display: inline-block; margin-top: 20px; }
+        button { background: #28a745; color: white; border: none; padding: 12px 20px; font-size: 18px; border-radius: 5px; cursor: pointer; margin: 5px; }
+        button.baglanBtn { background: #007bff; }
+        input { padding: 12px; font-size: 18px; width: 220px; border-radius: 5px; border: 1px solid #ccc; text-align: center; }
+        canvas { background: #000; border: 3px solid #fff; display: block; margin: 20px auto; touch-action: none; max-width: 100%; }
+        #durum { font-size: 20px; color: yellow; margin: 10px; }
     </style>
 </head>
 <body>
-    <h1>LAN İki Kişilik Oyun</h1>
+
+    <h1>Telefonla İki Kişilik LAN Oyunu</h1>
     
     <div id="menu">
-        <button id="sunucuOlustur">1. Cihaz (Oda Kur)</button>
-        <br>
-        <input type="text" id="odaKodu" placeholder="Oda Kodunu Gir">
-        <button id="baglan">2. Cihaz (Oyuna Katıl)</button>
+        <div id="sunucuBolumu">
+            <button id="odaAcBtn">1. Cihaz: Oda Kur</button>
+        </div>
+        <hr style="border-color: #444; margin: 15px 0;">
+        <div id="istemciBolumu">
+            <input type="text" id="kodInput" placeholder="Oda Kodunu Buraya Yaz">
+            <br>
+            <button id="katilBtn" class="baglanBtn">2. Cihaz: Oyuna Katıl</button>
+        </div>
     </div>
 
-    <h3 id="durum">Bağlantı Bekleniyor...</h3>
+    <div id="durum">Durum: Bekleniyor...</div>
     <canvas id="oyun" width="350" height="350"></canvas>
 
     <script>
         const canvas = document.getElementById("oyun");
         const ctx = canvas.getContext("2d");
 
-        let peer, conn;
+        let peer;
+        let conn;
+        
+        // Oyuncu pozisyonları (Kırmızı: Sen, Mavi: Diğerleri)
         let benimKarem = { x: 50, y: 50, renk: "red" };
         let digerKarem = { x: 200, y: 200, renk: "blue" };
-        let rol = ""; // "host" veya "client"
 
-        // 1. Cihaz Oda Kurar
-        document.getElementById("sunucuOlustur").addEventListener("click", () => {
-            peer = new Peer(); // Rastgele bir oda ID'si oluşturur
+        // 1. CİHAZ: Oda Kurma Tuşuna Basınca
+        document.getElementById("odaAcBtn").addEventListener("click", () => {
+            document.getElementById("durum").innerText = "Oda açılıyor, lütfen bekleyin...";
+            
+            // Rastgele peer nesnesi üret
+            peer = new Peer();
+
             peer.on("open", (id) => {
-                document.getElementById("durum").innerText = "Oda Kodun: " + id + " (Bu kodu diğer cihaza yaz)";
-                rol = "host";
+                document.getElementById("duruminnerHTML").innerText = "";
+                document.getElementById("durum").innerHTML = "Oda Kodun: <b style='color:#00ff00; font-size:24px;'>" + id + "</b><br>Bu kodu 2. cihaza yaz!";
+                document.getElementById("istemciBolumu").style.display = "none"; // Diğer kısmı gizle
             });
 
+            // 2. Cihaz bağlandığında çalışır
             peer.on("connection", (connection) => {
                 conn = connection;
-                setupConnection();
-                document.getElementById("menu").style.display = "none";
-                document.getElementById("durum").innerText = "Bağlantı Başarılı! Oyna.";
+                baglantiKuruldu();
             });
         });
 
-        // 2. Cihaz Odaya Katılır
-        document.getElementById("baglan").addEventListener("click", () => {
-            const kod = document.getElementById("odaKodu").value;
+        // 2. CİHAZ: Oyuna Katıl Tuşuna Basınca
+        document.getElementById("katilBtn").addEventListener("click", () => {
+            const girilenKod = document.getElementById("kodInput").value.trim();
+            if(!girilenKod) {
+                alert("Lütfen 1. cihazdaki kodu kutuya yaz!");
+                return;
+            }
+
+            document.getElementById("durum").innerText = "Bağlanmaya çalışılıyor...";
             peer = new Peer();
-            
+
             peer.on("open", () => {
-                conn = peer.connect(kod);
-                setupConnection();
-                document.getElementById("menu").style.display = "none";
-                document.getElementById("durum").innerText = "Bağlantı Başarılı! Oyna.";
-                rol = "client";
+                conn = peer.connect(girilenKod);
+                baglantiKuruldu();
             });
         });
 
-        function setupConnection() {
+        // Bağlantı sağlandığında ekranı oyun moduna sok
+        function baglantiKuruldu() {
+            document.getElementById("durum").innerText = "BAĞLANTI BAŞARILI! Oyuna başlayın.";
+            document.getElementById("menu").style.display = "none"; // Menüyü tamamen yok et
+
+            // Karşı taraftan veri gelince
             conn.on("data", (data) => {
-                // Diğer cihazdan gelen koordinatları al
                 digerKarem.x = data.x;
                 digerKarem.y = data.y;
             });
         }
 
-        // Ekrana dokunarak kendi kareni hareket ettir
+        // Ekrana dokunulduğunda çalışır
         canvas.addEventListener("pointerdown", (e) => {
             const rect = canvas.getBoundingClientRect();
             benimKarem.x = e.clientX - rect.left;
             benimKarem.y = e.clientY - rect.top;
 
-            // Yerini diğer cihaza anında gönder
+            // Eğer bağlantı kurulmuşsa koordinatları anında diğer cihaza fırlat
             if (conn && conn.open) {
                 conn.send({ x: benimKarem.x, y: benimKarem.y });
             }
         });
 
+        // Oyun Döngüsü (Sürekli ekranı çizer)
         function ciz() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Kırmızı kareyi çiz
+            // Kendi karemi çiz
             ctx.fillStyle = benimKarem.renk;
             ctx.fillRect(benimKarem.x - 15, benimKarem.y - 15, 30, 30);
 
-            // Mavi kareyi çiz
+            // Diğer oyuncunun karesini çiz
             ctx.fillStyle = digerKarem.renk;
             ctx.fillRect(digerKarem.x - 15, digerKarem.y - 15, 30, 30);
 
             requestAnimationFrame(ciz);
         }
+
         ciz();
     </script>
 </body>
