@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Crewmate Battle Arena - LAN</title>
     <!-- PeerJS kütüphanesi -->
     <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
@@ -13,7 +13,8 @@
             box-sizing: border-box;
             user-select: none;
             -webkit-user-select: none;
-            touch-action: none;
+            -webkit-touch-callout: none;
+            touch-action: manipulation; /* Çift dokunma yakınlaştırmasını önler */
         }
         body, html {
             margin: 0;
@@ -24,6 +25,7 @@
             color: #fff;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             overflow: hidden;
+            position: fixed; /* Ekran kaymasını önler */
         }
 
         /* LOBBY / MENÜ STİLLERİ */
@@ -97,6 +99,7 @@
             border: 2px solid rgba(255, 255, 255, 0.2);
             border-radius: 50%;
             backdrop-filter: blur(5px);
+            touch-action: none;
         }
         #joystick-knob {
             position: absolute;
@@ -107,6 +110,7 @@
             background: radial-gradient(circle, #00ffcc 0%, #0088cc 100%);
             border-radius: 50%;
             box-shadow: 0 0 15px rgba(0, 255, 204, 0.8);
+            pointer-events: none;
         }
         #attack-btn {
             position: absolute;
@@ -117,7 +121,7 @@
             background: radial-gradient(circle, #ff3366 0%, #990033 100%);
             border: 3px solid rgba(255, 255, 255, 0.4);
             border-radius: 50%;
-            box-shadow: 0 0 20px rgba(ff, 51, 102, 0.6);
+            box-shadow: 0 0 20px rgba(255, 51, 102, 0.6);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -125,6 +129,7 @@
             font-size: 20px;
             color: #fff;
             text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            touch-action: none;
         }
         #attack-btn:active {
             transform: scale(0.92);
@@ -140,6 +145,7 @@
             padding: 10px;
             border-radius: 12px;
             backdrop-filter: blur(8px);
+            pointer-events: none;
         }
         #p1-hud { left: 15px; }
         #p2-hud { right: 15px; text-align: right; }
@@ -192,6 +198,20 @@
     </div>
 
     <script>
+        // Çift dokunma yakınlaştırmasını tarayıcı seviyesinde tam engelleme
+        document.addEventListener('touchstart', (e) => {
+            if (e.touches.length > 1) e.preventDefault();
+        }, { passive: false });
+
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', (e) => {
+            const now = (new Date()).getTime();
+            if (now - lastTouchEnd <= 300) {
+                e.preventDefault();
+            }
+            lastTouchEnd = now;
+        }, false);
+
         const canvas = document.getElementById('stage');
         const ctx = canvas.getContext('2d');
         
@@ -217,14 +237,13 @@
             p2: { x: screenW - 150, y: screenH / 2, vx: 0, vy: 0, hp: 100, color: '#3399ff', facing: 'left', isAttacking: false, attackTimer: 0 }
         };
 
-        let myRole = 'p1'; // Host: p1, Client: p2
+        let myRole = 'p1';
 
         // PEERJS VE QR KOD MANTIĞI
         const urlParams = new URLSearchParams(window.location.search);
         const joinId = urlParams.get('join');
 
         if (joinId) {
-            // QR ile giriş yapıldı
             document.getElementById('host-btn').style.display = 'none';
             document.getElementById('status').innerText = "Odaya bağlanılıyor...";
             myRole = 'p2';
@@ -277,11 +296,9 @@
 
             conn.on('data', (data) => {
                 if (data.type === 'state') {
-                    // Host'tan gelen güncel pozisyonlar
                     players = data.players;
                     updateHUD();
                 } else if (data.type === 'input') {
-                    // Client'tan Host'a gelen joystick ve saldırı verileri
                     if (isHost) {
                         players.p2.vx = data.vx;
                         players.p2.vy = data.vy;
@@ -298,33 +315,44 @@
             document.getElementById('p2-hp').style.width = Math.max(0, players.p2.hp) + '%';
         }
 
-        // JOYSTICK SİSTEMİ
+        // ÇOKLU DOKUNMA (MULTI-TOUCH) VE JOYSTICK SİSTEMİ
         const joyZone = document.getElementById('joystick-zone');
         const joyKnob = document.getElementById('joystick-knob');
-        let joyActive = false;
+        let joyPointerId = null;
         let joyCenter = { x: 0, y: 0 };
         let inputVx = 0, inputVy = 0;
 
         joyZone.addEventListener('pointerdown', (e) => {
-            joyActive = true;
+            e.preventDefault();
+            if (joyPointerId !== null) return;
+            joyPointerId = e.pointerId;
+            joyZone.setPointerCapture(e.pointerId);
+            
             const rect = joyZone.getBoundingClientRect();
             joyCenter = { x: rect.left + rect.width/2, y: rect.top + rect.height/2 };
             moveKnob(e.clientX, e.clientY);
         });
 
-        window.addEventListener('pointermove', (e) => {
-            if (joyActive) moveKnob(e.clientX, e.clientY);
+        joyZone.addEventListener('pointermove', (e) => {
+            if (e.pointerId === joyPointerId) {
+                e.preventDefault();
+                moveKnob(e.clientX, e.clientY);
+            }
         });
 
-        window.addEventListener('pointerup', () => {
-            if (joyActive) {
-                joyActive = false;
+        const resetJoystick = (e) => {
+            if (e.pointerId === joyPointerId) {
+                e.preventDefault();
+                joyPointerId = null;
                 joyKnob.style.transform = `translate(0px, 0px)`;
                 inputVx = 0;
                 inputVy = 0;
                 sendInput();
             }
-        });
+        };
+
+        joyZone.addEventListener('pointerup', resetJoystick);
+        joyZone.addEventListener('pointercancel', resetJoystick);
 
         function moveKnob(x, y) {
             let dx = x - joyCenter.x;
@@ -343,9 +371,10 @@
             sendInput();
         }
 
-        // SALDIRI BUTONU
+        // SALDIRI BUTONU (ÇOKLU DOKUNMA UYUMLU)
         const attackBtn = document.getElementById('attack-btn');
-        attackBtn.addEventListener('pointerdown', () => {
+        attackBtn.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
             if (isHost) {
                 if (!players.p1.isAttacking) triggerAttack('p1');
             } else {
@@ -365,9 +394,8 @@
         function triggerAttack(role) {
             let p = players[role];
             p.isAttacking = true;
-            p.attackTimer = 15; // 15 frame sürer
+            p.attackTimer = 15;
 
-            // Hasar Hesabı
             let enemyRole = role === 'p1' ? 'p2' : 'p1';
             let enemy = players[enemyRole];
 
@@ -375,72 +403,61 @@
             let dy = enemy.y - p.y;
             let dist = Math.hypot(dx, dy);
 
-            // Yakındaysa ve baktığı yöndeyse vurur
             if (dist < 65) {
                 enemy.hp -= 10;
                 if (enemy.hp < 0) enemy.hp = 0;
             }
         }
 
-        // FİZİK VE GÜNCELLEME (HOST TARAFINDAN YÖNETİLİR)
+        // FİZİK VE GÜNCELLEME
         function updatePhysics() {
             ['p1', 'p2'].forEach(key => {
                 let p = players[key];
                 
-                // Hareket
                 p.x += p.vx;
                 p.y += p.vy;
 
-                // Ekran Sınırları
                 p.x = Math.max(25, Math.min(screenW - 25, p.x));
                 p.y = Math.max(25, Math.min(screenH - 25, p.y));
 
-                // Yön Belirleme
                 if (p.vx > 0.5) p.facing = 'right';
                 if (p.vx < -0.5) p.facing = 'left';
 
-                // Saldırı Sayacı
                 if (p.isAttacking) {
                     p.attackTimer--;
                     if (p.attackTimer <= 0) p.isAttacking = false;
                 }
             });
 
-            // Verileri Client'a Gönder
             if (conn && conn.open) {
                 conn.send({ type: 'state', players: players });
             }
             updateHUD();
         }
 
-        // ÇİZİM MOTORU (GÖRSEL SİMÜLASYON)
+        // ÇİZİM MOTORU
         function drawCrewmate(p) {
             ctx.save();
             ctx.translate(p.x, p.y);
 
             if (p.facing === 'left') ctx.scale(-1, 1);
 
-            // Gölge
             ctx.fillStyle = 'rgba(0,0,0,0.3)';
             ctx.beginPath();
             ctx.ellipse(0, 20, 18, 7, 0, 0, Math.PI * 2);
             ctx.fill();
 
-            // Sırt Çantası
             ctx.fillStyle = p.color;
             ctx.fillRect(-22, -10, 8, 20);
 
-            // Gövde
             ctx.beginPath();
             ctx.arc(0, -5, 16, Math.PI, 0);
             ctx.rect(-16, -5, 32, 22);
             ctx.fill();
 
-            // Bacaklar
             ctx.fillRect(-14, 15, 10, 10);
             ctx.fillRect(4, 15, 10, 10);
 
-            // Göz Vizörü
             ctx.fillStyle = '#aaddff';
             ctx.beginPath();
             ctx.ellipse(4, -5, 10, 6, 0, 0, Math.PI * 2);
@@ -449,7 +466,6 @@
             ctx.lineWidth = 1.5;
             ctx.stroke();
 
-            // Saldırı Efekti (Kılıç/Yumruk Savurma)
             if (p.isAttacking) {
                 ctx.strokeStyle = '#ffcc00';
                 ctx.lineWidth = 4;
@@ -462,11 +478,9 @@
         }
 
         function drawMap() {
-            // Profesyonel Uzay Üssü Zemini
             ctx.fillStyle = '#0d111a';
             ctx.fillRect(0, 0, screenW, screenH);
 
-            // Kare Izgara Çizgileri
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
             ctx.lineWidth = 1;
             const gridSize = 40;
